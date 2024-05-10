@@ -5,10 +5,10 @@
 
 int main() {
     GLFWController controller;
-    GLFWControllerWindow window = controller.createWindow();
+    //GLFWControllerWindow window = controller.createWindow();
     VulkanApplication application(controller.getExtensions());
-    while (!window.shouldClose()) {
-        controller.pollEvents();
-    };
+    //while (!window.shouldClose()) {
+    //    controller.pollEvents();
+    //};
     return 0;
 };
