@@ -13,6 +13,11 @@ GLFWControllerWindow::GLFWControllerWindow() {
 bool GLFWControllerWindow::shouldClose() {
     return glfwWindowShouldClose(window);
 };
+
+GLFWwindow* GLFWControllerWindow::getGLFWWindow() const noexcept {
+    return window;
+};
+
 GLFWControllerWindow::~GLFWControllerWindow() { glfwDestroyWindow(window); };
 
 GLFWController::GLFWController() {

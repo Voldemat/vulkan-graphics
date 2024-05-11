@@ -10,6 +10,7 @@ class GLFWControllerWindow {
 public:
     GLFWControllerWindow();
     bool shouldClose();
+    GLFWwindow* getGLFWWindow() const noexcept;
     GLFWControllerWindow(const GLFWControllerWindow &other) = delete;
     ~GLFWControllerWindow();
 };
