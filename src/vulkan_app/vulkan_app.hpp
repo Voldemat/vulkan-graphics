@@ -33,7 +33,7 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-void assertSuccess(const VkResult &result);
+void assertSuccess(const VkResult &result, const std::string message);
 
 class VulkanApplication {
     VkInstance instance;
@@ -51,6 +51,15 @@ class VulkanApplication {
     std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
+    VkRenderPass renderPass;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
+    std::vector<VkFramebuffer> swapChainFrameBuffers;
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
     void createInstance(std::vector<const char *> extensions);
     void createWindowSurface(const GLFWControllerWindow &window);
     void pickPhysicalDevice();
@@ -58,6 +67,14 @@ class VulkanApplication {
     void createLogicalDevice();
     void createSwapChain(const GLFWControllerWindow& window);
     void createImageViews();
+    void createRenderPass();
+    void createGraphicsPipeline();
+    void createFramebuffers();
+    void createCommandPool();
+    void createCommandBuffer();
+    void recordCommandBuffer(uint32_t imageIndex);
+    void createSyncObjects();
+    VkShaderModule createShaderModule(const std::vector<char>& code);
     SwapChainSupportDetails queryDeviceSwapChainSupportDetails(
         const VkPhysicalDevice &device);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
@@ -66,6 +83,7 @@ class VulkanApplication {
     VkSurfaceFormatKHR chooseFormat(const SwapChainSupportDetails& details);
 
 public:
+    void drawFrame();
     VulkanApplication(const VulkanApplication &other) = delete;
     VulkanApplication(std::vector<const char *> extensions,
                       const GLFWControllerWindow &window);

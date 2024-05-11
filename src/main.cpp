@@ -7,8 +7,9 @@ int main() {
     GLFWController controller;
     GLFWControllerWindow window = controller.createWindow();
     VulkanApplication application(controller.getExtensions(), window);
-    // while (!window.shouldClose()) {
-    //     controller.pollEvents();
-    // };
+    while (!window.shouldClose()) {
+        controller.pollEvents();
+        application.drawFrame();
+    };
     return 0;
 };

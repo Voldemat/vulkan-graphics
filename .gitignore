@@ -1,3 +1,4 @@
 build
 .cache
 cases-lock.ls
+*.spv
