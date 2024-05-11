@@ -198,14 +198,17 @@ void VulkanApplication::createSwapChain(const GLFWControllerWindow &window) {
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = nullptr;
     };
-    VkResult result = vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
+    VkResult result =
+        vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
     assertSuccess(result);
 
     uint32_t swapChainImageCount;
-    result = vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount, nullptr);
+    result = vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount,
+                                     nullptr);
     assertSuccess(result);
     swapChainImages.resize(swapChainImageCount);
-    result = vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount, swapChainImages.data());
+    result = vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount,
+                                     swapChainImages.data());
     assertSuccess(result);
 };
 
@@ -303,9 +306,37 @@ VulkanApplication::VulkanApplication(std::vector<const char *> extensions,
     pickQueueFamilies();
     createLogicalDevice();
     createSwapChain(window);
+    createImageViews();
+};
+
+void VulkanApplication::createImageViews() {
+    swapChainImageViews.resize(swapChainImages.size());
+    int index = 0;
+    for (const auto &image : swapChainImages) {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = image;
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = swapChainFormat;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        VkResult result = vkCreateImageView(device, &createInfo, nullptr,
+                                            &swapChainImageViews[index]);
+        assertSuccess(result);
+        index++;
+    };
 };
 
 VulkanApplication::~VulkanApplication() {
+    for (const auto& imageView : swapChainImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    };
     vkDestroySwapchainKHR(device, swapChain, nullptr);
     vkDestroySurfaceKHR(instance, windowSurface, nullptr);
     vkDestroyDevice(device, nullptr);

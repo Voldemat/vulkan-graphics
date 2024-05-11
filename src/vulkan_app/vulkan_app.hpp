@@ -48,6 +48,7 @@ class VulkanApplication {
     std::optional<uint32_t> graphicsQueueIndex;
     std::optional<uint32_t> presentQueueIndex;
     std::vector<VkImage> swapChainImages;
+    std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
     void createInstance(std::vector<const char *> extensions);
@@ -56,6 +57,7 @@ class VulkanApplication {
     void pickQueueFamilies();
     void createLogicalDevice();
     void createSwapChain(const GLFWControllerWindow& window);
+    void createImageViews();
     SwapChainSupportDetails queryDeviceSwapChainSupportDetails(
         const VkPhysicalDevice &device);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
