@@ -7,96 +7,34 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <format>
 #include <fstream>
 #include <ios>
 #include <iostream>
 #include <limits>
-#include <optional>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "GLFW/glfw3.h"
 #include "glfw_controller.hpp"
+#include "vulkan_app/vki/vki_base.hpp"
+#include "vulkan_app/vki/vki_instance.hpp"
+#include "vulkan_app/vki/vki_physical_device.hpp"
 
-void VulkanApplication::createInstance(std::vector<const char *> extensions) {
-    extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-    extensions.push_back(
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Hello triangle";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
-    appInfo.pNext = nullptr;
-
-    const char *validationLayers[] = {
-        "VK_LAYER_KHRONOS_validation",
-    };
-    createInfo = new VkInstanceCreateInfo();
-    createInfo->sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo->pApplicationInfo = &appInfo;
-    createInfo->enabledExtensionCount = (uint32_t)extensions.size();
-    createInfo->ppEnabledExtensionNames = extensions.data();
-    createInfo->enabledLayerCount = 1;
-    createInfo->ppEnabledLayerNames = validationLayers;
-    createInfo->flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-    VkResult result = vkCreateInstance(createInfo, nullptr, &instance);
-    if (result != VK_SUCCESS) {
-        throw VulkanError(result, "vkCreateInstance");
-    };
-};
+using namespace vki;
 
 void VulkanApplication::pickPhysicalDevice() {
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-    if (deviceCount == 0) {
-        throw std::runtime_error("Failed to find gpu with vulkan support");
+    const auto &devices = instance.getPhysicalDevices();
+    const auto &it = std::ranges::find_if(
+        devices, [](const auto &device) { return device.isSuitable(); });
+    if (it == devices.end()) {
+        throw std::runtime_error("No suitable physical devices present");
     };
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-    for (const auto &device : devices) {
-        VkPhysicalDeviceProperties properties;
-        vkGetPhysicalDeviceProperties(device, &properties);
-        VkPhysicalDeviceFeatures deviceFeatures;
-        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-        std::cout << std::format(
-                         "Name: {}\nType: {}", properties.deviceName,
-                         string_VkPhysicalDeviceType(properties.deviceType))
-                  << std::endl;
-    };
-    physicalDevice = devices[0];
-};
-
-void VulkanApplication::pickQueueFamilies() {
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount,
-                                             nullptr);
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount,
-                                             queueFamilies.data());
-    uint32_t i = 0;
-    for (const auto &queueFamily : queueFamilies) {
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            graphicsQueueIndex = i;
-        };
-        VkBool32 presentSupport = false;
-        VkResult result = vkGetPhysicalDeviceSurfaceSupportKHR(
-            physicalDevice, i, windowSurface, &presentSupport);
-        if (result != VK_SUCCESS) {
-            throw VulkanError(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
-        };
-        if (presentSupport) {
-            presentQueueIndex = i;
-        };
-        i++;
-    }
-    if (!graphicsQueueIndex.has_value()) {
-        throw std::runtime_error(
-            "Suitable queue graphics family was not found");
-    };
+    physicalDevice = *it;
+    graphicsQueueIndex =
+        physicalDevice->getFamilyTypeIndex(vki::QueueFamilyType::GRAPHIC);
+    presentQueueIndex =
+        physicalDevice->getFamilyTypeIndex(vki::QueueFamilyType::PRESENT);
 };
 
 void VulkanApplication::createLogicalDevice() {
@@ -134,8 +72,8 @@ void VulkanApplication::createLogicalDevice() {
     createInfo.enabledExtensionCount = deviceExtensions.size();
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-    VkResult result =
-        vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);
+    VkResult result = vkCreateDevice(physicalDevice->getVkDevice(), &createInfo,
+                                     nullptr, &device);
     if (result != VK_SUCCESS) {
         throw VulkanError(result, "vkCreateDevice");
     };
@@ -144,7 +82,8 @@ void VulkanApplication::createLogicalDevice() {
 };
 
 void VulkanApplication::createSwapChain(const GLFWControllerWindow &window) {
-    auto details = queryDeviceSwapChainSupportDetails(physicalDevice);
+    auto details =
+        queryDeviceSwapChainSupportDetails(physicalDevice->getVkDevice());
     VkSurfaceFormatKHR format = chooseFormat(details);
     VkPresentModeKHR presentMode = choosePresentMode(details);
     swapChainExtent = chooseSwapExtent(details.capabilities, window);
@@ -156,7 +95,7 @@ void VulkanApplication::createSwapChain(const GLFWControllerWindow &window) {
     };
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = windowSurface;
+    createInfo.surface = instance.getSurface();
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = format.format;
     createInfo.imageColorSpace = format.colorSpace;
@@ -204,24 +143,25 @@ SwapChainSupportDetails VulkanApplication::queryDeviceSwapChainSupportDetails(
     const VkPhysicalDevice &device) {
     SwapChainSupportDetails details;
     VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        device, windowSurface, &details.capabilities);
+        device, instance.getSurface(), &details.capabilities);
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
     uint32_t formatCount;
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, windowSurface,
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, instance.getSurface(),
                                                   &formatCount, nullptr);
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
     details.formats.resize(formatCount);
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        device, windowSurface, &formatCount, details.formats.data());
+        device, instance.getSurface(), &formatCount, details.formats.data());
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
 
     uint32_t modesCount;
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(device, windowSurface,
-                                                       &modesCount, nullptr);
+    result = vkGetPhysicalDeviceSurfacePresentModesKHR(
+        device, instance.getSurface(), &modesCount, nullptr);
     assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     details.presentModes.resize(modesCount);
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device, windowSurface, &modesCount, details.presentModes.data());
+        device, instance.getSurface(), &modesCount,
+        details.presentModes.data());
     assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     if (details.formats.empty() || details.presentModes.empty()) {
         throw std::runtime_error("Formats or presentModes are empty");
@@ -271,21 +211,10 @@ VkExtent2D VulkanApplication::chooseSwapExtent(
     return actualExtent;
 };
 
-void VulkanApplication::createWindowSurface(
-    const GLFWControllerWindow &window) {
-    VkResult result = glfwCreateWindowSurface(instance, window.getGLFWWindow(),
-                                              nullptr, &windowSurface);
-    if (result != VK_SUCCESS) {
-        throw VulkanError(result, "glfwCreateWindowSurface");
-    };
-};
-
-VulkanApplication::VulkanApplication(std::vector<const char *> extensions,
-                                     const GLFWControllerWindow &window) {
-    createInstance(std::move(extensions));
-    createWindowSurface(window);
+VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
+                                     const GLFWControllerWindow &window)
+    : instance{ params, window } {
     pickPhysicalDevice();
-    pickQueueFamilies();
     createLogicalDevice();
     createSwapChain(window);
     createImageViews();
@@ -375,7 +304,8 @@ void VulkanApplication::drawFrame() {
 
     uint32_t imageIndex;
     result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
-                          imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+                                   imageAvailableSemaphore, VK_NULL_HANDLE,
+                                   &imageIndex);
     assertSuccess(result, "vkAcquireNextImageKHR");
     result = vkResetCommandBuffer(commandBuffer, 0);
     assertSuccess(result, "vkResetCommandBuffer");
@@ -384,15 +314,17 @@ void VulkanApplication::drawFrame() {
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+    VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -404,7 +336,7 @@ void VulkanApplication::drawFrame() {
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = {swapChain};
+    VkSwapchainKHR swapChains[] = { swapChain };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
@@ -664,7 +596,5 @@ VulkanApplication::~VulkanApplication() {
         vkDestroyImageView(device, imageView, nullptr);
     };
     vkDestroySwapchainKHR(device, swapChain, nullptr);
-    vkDestroySurfaceKHR(instance, windowSurface, nullptr);
     vkDestroyDevice(device, nullptr);
-    vkDestroyInstance(instance, nullptr);
 };

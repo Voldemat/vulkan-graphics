@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "GLFW/glfw3.h"
@@ -14,7 +15,7 @@ bool GLFWControllerWindow::shouldClose() {
     return glfwWindowShouldClose(window);
 };
 
-GLFWwindow* GLFWControllerWindow::getGLFWWindow() const noexcept {
+GLFWwindow *GLFWControllerWindow::getGLFWWindow() const noexcept {
     return window;
 };
 
@@ -32,11 +33,11 @@ GLFWControllerWindow GLFWController::createWindow() {
 
 void GLFWController::pollEvents() { glfwPollEvents(); };
 
-std::vector<const char *> GLFWController::getExtensions() {
+std::vector<std::string> GLFWController::getRequiredExtensions() {
     uint32_t extensionCount = 0;
     const char **glfwExtensions =
         glfwGetRequiredInstanceExtensions(&extensionCount);
-    std::vector<const char *> extensions;
+    std::vector<std::string> extensions;
     for (uint32_t i = 0; i < extensionCount; i++) {
         extensions.emplace_back(glfwExtensions[i]);
     };

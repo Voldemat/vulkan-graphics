@@ -4,6 +4,9 @@
     "configurePresets": [
         {
             "name": "default",
+            "cacheVariables": {
+                "CMAKE_OSX_SYSROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+            },
             "environment": {
                 "CC": "/Users/vladimir/code/opensource/llvm-project/builds/clang/bin/clang",
                 "CXX": "/Users/vladimir/code/opensource/llvm-project/builds/clang/bin/clang++",

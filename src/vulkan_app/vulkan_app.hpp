@@ -5,27 +5,13 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <exception>
-#include <format>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "glfw_controller.hpp"
-
-class VulkanError : public std::exception {
-    std::string resultString;
-    std::string message;
-    std::string finalMessage;
-
-public:
-    VulkanError(const VkResult &result, std::string msg) {
-        resultString = string_VkResult(result);
-        message = msg;
-        finalMessage = std::format("{}: {}", msg, resultString);
-    };
-    const char *what() const noexcept { return finalMessage.data(); };
-};
+#include "vulkan_app/vki/vki_instance.hpp"
+#include "vulkan_app/vki/vki_physical_device.hpp"
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -36,14 +22,11 @@ struct SwapChainSupportDetails {
 void assertSuccess(const VkResult &result, const std::string message);
 
 class VulkanApplication {
-    VkInstance instance;
-    VkApplicationInfo appInfo;
+    vki::VulkanInstance instance;
     VkDevice device;
-    VkInstanceCreateInfo *createInfo;
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    std::optional<vki::PhysicalDevice> physicalDevice;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
-    VkSurfaceKHR windowSurface;
     VkSwapchainKHR swapChain;
     std::optional<uint32_t> graphicsQueueIndex;
     std::optional<uint32_t> presentQueueIndex;
@@ -60,12 +43,9 @@ class VulkanApplication {
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
     VkFence inFlightFence;
-    void createInstance(std::vector<const char *> extensions);
-    void createWindowSurface(const GLFWControllerWindow &window);
     void pickPhysicalDevice();
-    void pickQueueFamilies();
     void createLogicalDevice();
-    void createSwapChain(const GLFWControllerWindow& window);
+    void createSwapChain(const GLFWControllerWindow &window);
     void createImageViews();
     void createRenderPass();
     void createGraphicsPipeline();
@@ -74,18 +54,18 @@ class VulkanApplication {
     void createCommandBuffer();
     void recordCommandBuffer(uint32_t imageIndex);
     void createSyncObjects();
-    VkShaderModule createShaderModule(const std::vector<char>& code);
+    VkShaderModule createShaderModule(const std::vector<char> &code);
     SwapChainSupportDetails queryDeviceSwapChainSupportDetails(
         const VkPhysicalDevice &device);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
                                 const GLFWControllerWindow &window);
-    VkPresentModeKHR choosePresentMode(const SwapChainSupportDetails& details);
-    VkSurfaceFormatKHR chooseFormat(const SwapChainSupportDetails& details);
+    VkPresentModeKHR choosePresentMode(const SwapChainSupportDetails &details);
+    VkSurfaceFormatKHR chooseFormat(const SwapChainSupportDetails &details);
 
 public:
     void drawFrame();
     VulkanApplication(const VulkanApplication &other) = delete;
-    VulkanApplication(std::vector<const char *> extensions,
+    VulkanApplication(vki::VulkanInstanceParams params,
                       const GLFWControllerWindow &window);
     ~VulkanApplication();
 };

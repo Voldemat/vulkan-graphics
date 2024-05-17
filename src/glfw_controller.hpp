@@ -1,5 +1,6 @@
 #ifndef GLFW_CONTROLLER
 #define GLFW_CONTROLLER
+#include <string>
 #include <vector>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -21,7 +22,7 @@ public:
     GLFWController(const GLFWController &other) = delete;
     GLFWControllerWindow createWindow();
     void pollEvents();
-    std::vector<const char *> getExtensions();
+    std::vector<std::string> getRequiredExtensions();
     ~GLFWController();
 };
 #endif

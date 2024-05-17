@@ -2,11 +2,19 @@
 
 #include "./glfw_controller.hpp"
 #include "./vulkan_app/vulkan_app.hpp"
+#include "vulkan_app/vki/vki_instance.hpp"
 
 int main() {
     GLFWController controller;
     GLFWControllerWindow window = controller.createWindow();
-    VulkanApplication application(controller.getExtensions(), window);
+    vki::VulkanInstanceParams params = {
+        .extensions = controller.getRequiredExtensions(),
+        .appName = "Hello triangle",
+        .appVersion = { 1, 0, 0 },
+        .apiVersion = VK_API_VERSION_1_3,
+        .layers = { "VK_LAYER_KHRONOS_validation" },
+    };
+    VulkanApplication application(params, window);
     while (!window.shouldClose()) {
         controller.pollEvents();
         application.drawFrame();
