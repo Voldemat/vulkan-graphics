@@ -17,3 +17,5 @@ jobs:
       run: sudo apt-get update && sudo apt-get install --no-install-recommends -y xorg openbox
     - name: CMake Action
       uses: threeal/cmake-action@v1.3.0
+      env:
+        GLFW_BUILD_WAYLAND: 0
