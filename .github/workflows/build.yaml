@@ -19,3 +19,4 @@ jobs:
       uses: threeal/cmake-action@v1.3.0
       with:
         args: -DGLFW_BUILD_WAYLAND=0
+        run-build: true
