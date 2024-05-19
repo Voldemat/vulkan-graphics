@@ -13,6 +13,7 @@
 #include "vulkan_app/vki/instance.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/render_pass.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 
 
@@ -26,7 +27,7 @@ class VulkanApplication {
     std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
-    VkRenderPass renderPass;
+    std::optional<std::unique_ptr<vki::RenderPass>> renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapChainFrameBuffers;
