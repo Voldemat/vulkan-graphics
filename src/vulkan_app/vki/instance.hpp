@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "./vki_base.hpp"
-#include "./vki_physical_device.hpp"
+#include "./base.hpp"
+#include "./physical_device.hpp"
 #include "glfw_controller.hpp"
 
 namespace vki {

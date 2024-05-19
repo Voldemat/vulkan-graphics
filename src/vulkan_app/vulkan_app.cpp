@@ -11,15 +11,18 @@
 #include <ios>
 #include <iostream>
 #include <limits>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "GLFW/glfw3.h"
 #include "glfw_controller.hpp"
-#include "vulkan_app/vki/vki_base.hpp"
-#include "vulkan_app/vki/vki_instance.hpp"
-#include "vulkan_app/vki/vki_physical_device.hpp"
+#include "vulkan_app/vki/base.hpp"
+#include "vulkan_app/vki/instance.hpp"
+#include "vulkan_app/vki/logical_device.hpp"
+#include "vulkan_app/vki/physical_device.hpp"
 
 using namespace vki;
 
@@ -38,47 +41,7 @@ void VulkanApplication::pickPhysicalDevice() {
 };
 
 void VulkanApplication::createLogicalDevice() {
-    float queuePriority = 1.0f;
-    VkDeviceQueueCreateInfo graphicsQueueCreateInfo{};
-    graphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    graphicsQueueCreateInfo.queueFamilyIndex = graphicsQueueIndex.value();
-    graphicsQueueCreateInfo.queueCount = 1;
-    graphicsQueueCreateInfo.pQueuePriorities = &queuePriority;
-
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfoArray;
-    queueCreateInfoArray.push_back(graphicsQueueCreateInfo);
-    if (presentQueueIndex != graphicsQueueIndex) {
-        VkDeviceQueueCreateInfo presentQueueCreateInfo{};
-        presentQueueCreateInfo.sType =
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        presentQueueCreateInfo.queueFamilyIndex = presentQueueIndex.value();
-        presentQueueCreateInfo.queueCount = 1;
-        presentQueueCreateInfo.pQueuePriorities = &queuePriority;
-
-        queueCreateInfoArray.push_back(presentQueueCreateInfo);
-    };
-
-    std::vector<const char *> deviceExtensions;
-    deviceExtensions.push_back("VK_KHR_portability_subset");
-    deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-    VkPhysicalDeviceFeatures deviceFeatures{};
-
-    VkDeviceCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.queueCreateInfoCount = queueCreateInfoArray.size();
-    createInfo.pQueueCreateInfos = queueCreateInfoArray.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = deviceExtensions.size();
-    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-
-    VkResult result = vkCreateDevice(physicalDevice->getVkDevice(), &createInfo,
-                                     nullptr, &device);
-    if (result != VK_SUCCESS) {
-        throw VulkanError(result, "vkCreateDevice");
-    };
-    vkGetDeviceQueue(device, graphicsQueueIndex.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, presentQueueIndex.value(), 0, &presentQueue);
+    device = std::make_unique<vki::LogicalDevice>(physicalDevice.value());
 };
 
 void VulkanApplication::createSwapChain(const GLFWControllerWindow &window) {
@@ -120,15 +83,15 @@ void VulkanApplication::createSwapChain(const GLFWControllerWindow &window) {
         createInfo.pQueueFamilyIndices = nullptr;
     };
     VkResult result =
-        vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
+        vkCreateSwapchainKHR(device.value()->getVkDevice(), &createInfo, nullptr, &swapChain);
     assertSuccess(result, "vkCreateSwapchainKHR");
 
     uint32_t swapChainImageCount;
-    result = vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount,
+    result = vkGetSwapchainImagesKHR(device.value()->getVkDevice(), swapChain, &swapChainImageCount,
                                      nullptr);
     assertSuccess(result, "vkGetSwapchainImagesKHR");
     swapChainImages.resize(swapChainImageCount);
-    result = vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount,
+    result = vkGetSwapchainImagesKHR(device.value()->getVkDevice(), swapChain, &swapChainImageCount,
                                      swapChainImages.data());
     assertSuccess(result, "vkGetSwapchainImagesKHR");
 };
@@ -140,27 +103,27 @@ void assertSuccess(const VkResult &result, const std::string message) {
 };
 
 SwapChainSupportDetails VulkanApplication::queryDeviceSwapChainSupportDetails(
-    const VkPhysicalDevice &device) {
+    const VkPhysicalDevice &pDevice) {
     SwapChainSupportDetails details;
     VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        device, instance.getSurface(), &details.capabilities);
+        pDevice, instance.getSurface(), &details.capabilities);
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
     uint32_t formatCount;
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, instance.getSurface(),
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, instance.getSurface(),
                                                   &formatCount, nullptr);
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
     details.formats.resize(formatCount);
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        device, instance.getSurface(), &formatCount, details.formats.data());
+        pDevice, instance.getSurface(), &formatCount, details.formats.data());
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
 
     uint32_t modesCount;
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device, instance.getSurface(), &modesCount, nullptr);
+        pDevice, instance.getSurface(), &modesCount, nullptr);
     assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     details.presentModes.resize(modesCount);
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device, instance.getSurface(), &modesCount,
+        pDevice, instance.getSurface(), &modesCount,
         details.presentModes.data());
     assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     if (details.formats.empty() || details.presentModes.empty()) {
@@ -232,7 +195,7 @@ void VulkanApplication::createCommandPool() {
     commandPoolCreateInfo.flags =
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     commandPoolCreateInfo.queueFamilyIndex = graphicsQueueIndex.value();
-    VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo,
+    VkResult result = vkCreateCommandPool(device.value()->getVkDevice(), &commandPoolCreateInfo,
                                           nullptr, &commandPool);
     assertSuccess(result, "vkCreateCommandPool");
 };
@@ -245,7 +208,7 @@ void VulkanApplication::createCommandBuffer() {
     allocInfo.commandBufferCount = 1;
 
     VkResult result =
-        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+        vkAllocateCommandBuffers(device.value()->getVkDevice(), &allocInfo, &commandBuffer);
     assertSuccess(result, "vkAllocateCommandBuffers");
 };
 
@@ -285,25 +248,25 @@ void VulkanApplication::createSyncObjects() {
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    VkResult result = vkCreateSemaphore(device, &semaphoreInfo, nullptr,
+    VkResult result = vkCreateSemaphore(device.value()->getVkDevice(), &semaphoreInfo, nullptr,
                                         &imageAvailableSemaphore);
     assertSuccess(result, "vkCreateSemaphore - imageAvailableSemaphore");
-    result = vkCreateSemaphore(device, &semaphoreInfo, nullptr,
+    result = vkCreateSemaphore(device.value()->getVkDevice(), &semaphoreInfo, nullptr,
                                &renderFinishedSemaphore);
     assertSuccess(result, "vkCreateSemaphore - renderFinishedSemaphore");
-    result = vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence);
+    result = vkCreateFence(device.value()->getVkDevice(), &fenceInfo, nullptr, &inFlightFence);
     assertSuccess(result, "vkCreateFence");
 };
 
 void VulkanApplication::drawFrame() {
     VkResult result =
-        vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
+        vkWaitForFences(device.value()->getVkDevice(), 1, &inFlightFence, VK_TRUE, UINT64_MAX);
     assertSuccess(result, "vkWaitForFences");
-    result = vkResetFences(device, 1, &inFlightFence);
+    result = vkResetFences(device.value()->getVkDevice(), 1, &inFlightFence);
     assertSuccess(result, "vkResetFences");
 
     uint32_t imageIndex;
-    result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
+    result = vkAcquireNextImageKHR(device.value()->getVkDevice(), swapChain, UINT64_MAX,
                                    imageAvailableSemaphore, VK_NULL_HANDLE,
                                    &imageIndex);
     assertSuccess(result, "vkAcquireNextImageKHR");
@@ -328,7 +291,7 @@ void VulkanApplication::drawFrame() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence);
+    result = vkQueueSubmit(device.value()->graphicsQueue, 1, &submitInfo, inFlightFence);
     assertSuccess(result, "vkQueueSubmit");
 
     VkPresentInfoKHR presentInfo{};
@@ -341,7 +304,7 @@ void VulkanApplication::drawFrame() {
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
 
-    result = vkQueuePresentKHR(presentQueue, &presentInfo);
+    result = vkQueuePresentKHR(device.value()->presentQueue, &presentInfo);
     assertSuccess(result, "vkQueuePresentKHR");
 };
 
@@ -359,7 +322,7 @@ void VulkanApplication::createFramebuffers() {
         framebufferInfo.height = swapChainExtent.height;
         framebufferInfo.layers = 1;
 
-        VkResult result = vkCreateFramebuffer(device, &framebufferInfo, nullptr,
+        VkResult result = vkCreateFramebuffer(device.value()->getVkDevice(), &framebufferInfo, nullptr,
                                               &swapChainFrameBuffers[i]);
         assertSuccess(result, "vkCreateFramebuffer");
     };
@@ -403,7 +366,7 @@ void VulkanApplication::createRenderPass() {
     renderPassCreateInfo.pDependencies = &dependency;
 
     VkResult result =
-        vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass);
+        vkCreateRenderPass(device.value()->getVkDevice(), &renderPassCreateInfo, nullptr, &renderPass);
     assertSuccess(result, "vkCreateRenderPass");
 };
 
@@ -428,7 +391,7 @@ VkShaderModule VulkanApplication::createShaderModule(
     createInfo.codeSize = code.size();
     VkShaderModule shaderModule;
     VkResult result =
-        vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule);
+        vkCreateShaderModule(device.value()->getVkDevice(), &createInfo, nullptr, &shaderModule);
     assertSuccess(result, "vkCreateShaderModule");
     return shaderModule;
 };
@@ -530,7 +493,7 @@ void VulkanApplication::createGraphicsPipeline() {
     pipelineLayoutCreateInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-    VkResult result = vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo,
+    VkResult result = vkCreatePipelineLayout(device.value()->getVkDevice(), &pipelineLayoutCreateInfo,
                                              nullptr, &pipelineLayout);
     assertSuccess(result, "vkCreatePipelineLayout");
 
@@ -548,11 +511,11 @@ void VulkanApplication::createGraphicsPipeline() {
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
 
-    result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo,
+    result = vkCreateGraphicsPipelines(device.value()->getVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo,
                                        nullptr, &graphicsPipeline);
     assertSuccess(result, "vkCreateGraphicsPipelines");
-    vkDestroyShaderModule(device, vertShader, nullptr);
-    vkDestroyShaderModule(device, fragmentShader, nullptr);
+    vkDestroyShaderModule(device.value()->getVkDevice(), vertShader, nullptr);
+    vkDestroyShaderModule(device.value()->getVkDevice(), fragmentShader, nullptr);
 };
 
 void VulkanApplication::createImageViews() {
@@ -573,7 +536,7 @@ void VulkanApplication::createImageViews() {
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
-        VkResult result = vkCreateImageView(device, &createInfo, nullptr,
+        VkResult result = vkCreateImageView(device.value()->getVkDevice(), &createInfo, nullptr,
                                             &swapChainImageViews[index]);
         assertSuccess(result, "vkCreateImageView");
         index++;
@@ -581,20 +544,19 @@ void VulkanApplication::createImageViews() {
 };
 
 VulkanApplication::~VulkanApplication() {
-    vkDeviceWaitIdle(device);
-    vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-    vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-    vkDestroyFence(device, inFlightFence, nullptr);
-    vkDestroyCommandPool(device, commandPool, nullptr);
+    vkDeviceWaitIdle(device.value()->getVkDevice());
+    vkDestroySemaphore(device.value()->getVkDevice(), imageAvailableSemaphore, nullptr);
+    vkDestroySemaphore(device.value()->getVkDevice(), renderFinishedSemaphore, nullptr);
+    vkDestroyFence(device.value()->getVkDevice(), inFlightFence, nullptr);
+    vkDestroyCommandPool(device.value()->getVkDevice(), commandPool, nullptr);
     for (const auto &framebuffer : swapChainFrameBuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
+        vkDestroyFramebuffer(device.value()->getVkDevice(), framebuffer, nullptr);
     };
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyRenderPass(device, renderPass, nullptr);
+    vkDestroyPipeline(device.value()->getVkDevice(), graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(device.value()->getVkDevice(), pipelineLayout, nullptr);
+    vkDestroyRenderPass(device.value()->getVkDevice(), renderPass, nullptr);
     for (const auto &imageView : swapChainImageViews) {
-        vkDestroyImageView(device, imageView, nullptr);
+        vkDestroyImageView(device.value()->getVkDevice(), imageView, nullptr);
     };
-    vkDestroySwapchainKHR(device, swapChain, nullptr);
-    vkDestroyDevice(device, nullptr);
+    vkDestroySwapchainKHR(device.value()->getVkDevice(), swapChain, nullptr);
 };

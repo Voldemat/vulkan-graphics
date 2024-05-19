@@ -1,4 +1,4 @@
-#include "./vki_instance.hpp"
+#include "./instance.hpp"
 
 #include <vulkan/vulkan_core.h>
 
@@ -6,8 +6,8 @@
 #include <ranges>
 #include <vector>
 
-#include "./vki_base.hpp"
-#include "./vki_physical_device.hpp"
+#include "./base.hpp"
+#include "./physical_device.hpp"
 #include "GLFW/glfw3.h"
 #include "glfw_controller.hpp"
 

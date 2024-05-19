@@ -2,7 +2,7 @@
 
 #include "./glfw_controller.hpp"
 #include "./vulkan_app/vulkan_app.hpp"
-#include "vulkan_app/vki/vki_instance.hpp"
+#include "vulkan_app/vki/instance.hpp"
 
 int main() {
     GLFWController controller;

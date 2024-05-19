@@ -5,13 +5,15 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "glfw_controller.hpp"
-#include "vulkan_app/vki/vki_instance.hpp"
-#include "vulkan_app/vki/vki_physical_device.hpp"
+#include "vulkan_app/vki/instance.hpp"
+#include "vulkan_app/vki/logical_device.hpp"
+#include "vulkan_app/vki/physical_device.hpp"
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -23,10 +25,8 @@ void assertSuccess(const VkResult &result, const std::string message);
 
 class VulkanApplication {
     vki::VulkanInstance instance;
-    VkDevice device;
+    std::optional<std::unique_ptr<vki::LogicalDevice>> device;
     std::optional<vki::PhysicalDevice> physicalDevice;
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
     VkSwapchainKHR swapChain;
     std::optional<uint32_t> graphicsQueueIndex;
     std::optional<uint32_t> presentQueueIndex;

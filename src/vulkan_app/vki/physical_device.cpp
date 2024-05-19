@@ -1,11 +1,11 @@
-#include "./vki_physical_device.hpp"
+#include "./physical_device.hpp"
 
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <vector>
 
-#include "./vki_base.hpp"
+#include "./base.hpp"
 
 vki::PhysicalDevice::PhysicalDevice(const VkPhysicalDevice &dev,
                                     const VkSurfaceKHR &surface)
