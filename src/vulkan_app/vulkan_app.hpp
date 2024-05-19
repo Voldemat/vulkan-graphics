@@ -7,30 +7,22 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <string>
 #include <vector>
 
 #include "glfw_controller.hpp"
 #include "vulkan_app/vki/instance.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/swapchain.hpp"
 
-struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
-void assertSuccess(const VkResult &result, const std::string message);
 
 class VulkanApplication {
     vki::VulkanInstance instance;
     std::optional<std::unique_ptr<vki::LogicalDevice>> device;
     std::optional<vki::PhysicalDevice> physicalDevice;
-    VkSwapchainKHR swapChain;
+    std::optional<std::unique_ptr<vki::Swapchain>> swapchain;
     std::optional<uint32_t> graphicsQueueIndex;
     std::optional<uint32_t> presentQueueIndex;
-    std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
@@ -55,12 +47,6 @@ class VulkanApplication {
     void recordCommandBuffer(uint32_t imageIndex);
     void createSyncObjects();
     VkShaderModule createShaderModule(const std::vector<char> &code);
-    SwapChainSupportDetails queryDeviceSwapChainSupportDetails(
-        const VkPhysicalDevice &device);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
-                                const GLFWControllerWindow &window);
-    VkPresentModeKHR choosePresentMode(const SwapChainSupportDetails &details);
-    VkSurfaceFormatKHR chooseFormat(const SwapChainSupportDetails &details);
 
 public:
     void drawFrame();

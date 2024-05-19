@@ -26,3 +26,11 @@ const char *vki::VulkanError::what() const noexcept {
 uint32_t vki::SemVer::to_vk_repr() const noexcept {
     return VK_MAKE_VERSION(major, minor, patch);
 };
+
+void vki::assertSuccess(const VkResult &result, const std::string message) {
+    if (result != VK_SUCCESS) {
+        throw vki::VulkanError(result, message);
+    };
+};
+
+

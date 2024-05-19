@@ -32,6 +32,9 @@ struct SemVer {
 
 const char *c_str_or_nullptr(const std::optional<std::string> &opt);
 
+void assertSuccess(const VkResult &result, const std::string message);
+
+
 };  // namespace vki
 
 #endif

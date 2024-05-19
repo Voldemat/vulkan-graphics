@@ -10,26 +10,25 @@
 #include <fstream>
 #include <ios>
 #include <iostream>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "GLFW/glfw3.h"
 #include "glfw_controller.hpp"
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/instance.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/swapchain.hpp"
 
 using namespace vki;
 
 void VulkanApplication::pickPhysicalDevice() {
     const auto &devices = instance.getPhysicalDevices();
     const auto &it = std::ranges::find_if(
-        devices, [](const auto &device) { return device.isSuitable(); });
+        devices, [](const vki::PhysicalDevice &device) { return device.isSuitable(); });
     if (it == devices.end()) {
         throw std::runtime_error("No suitable physical devices present");
     };
@@ -45,134 +44,17 @@ void VulkanApplication::createLogicalDevice() {
 };
 
 void VulkanApplication::createSwapChain(const GLFWControllerWindow &window) {
-    auto details =
-        queryDeviceSwapChainSupportDetails(physicalDevice->getVkDevice());
-    VkSurfaceFormatKHR format = chooseFormat(details);
-    VkPresentModeKHR presentMode = choosePresentMode(details);
-    swapChainExtent = chooseSwapExtent(details.capabilities, window);
-    swapChainFormat = format.format;
-    uint32_t imageCount = details.capabilities.minImageCount + 1;
-    if (details.capabilities.maxImageCount > 0 &&
-        imageCount > details.capabilities.maxImageCount) {
-        imageCount = details.capabilities.maxImageCount;
-    };
-    VkSwapchainCreateInfoKHR createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = instance.getSurface();
-    createInfo.minImageCount = imageCount;
-    createInfo.imageFormat = format.format;
-    createInfo.imageColorSpace = format.colorSpace;
-    createInfo.imageExtent = swapChainExtent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    createInfo.preTransform = details.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-    if (graphicsQueueIndex != presentQueueIndex) {
-        std::vector<uint32_t> queueIndices;
-        queueIndices.push_back(graphicsQueueIndex.value());
-        queueIndices.push_back(presentQueueIndex.value());
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueIndices.data();
-    } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        createInfo.queueFamilyIndexCount = 0;
-        createInfo.pQueueFamilyIndices = nullptr;
-    };
-    VkResult result =
-        vkCreateSwapchainKHR(device.value()->getVkDevice(), &createInfo, nullptr, &swapChain);
-    assertSuccess(result, "vkCreateSwapchainKHR");
-
-    uint32_t swapChainImageCount;
-    result = vkGetSwapchainImagesKHR(device.value()->getVkDevice(), swapChain, &swapChainImageCount,
-                                     nullptr);
-    assertSuccess(result, "vkGetSwapchainImagesKHR");
-    swapChainImages.resize(swapChainImageCount);
-    result = vkGetSwapchainImagesKHR(device.value()->getVkDevice(), swapChain, &swapChainImageCount,
-                                     swapChainImages.data());
-    assertSuccess(result, "vkGetSwapchainImagesKHR");
+    auto details = physicalDevice->getSwapchainDetails(instance.getSurface());
+    swapChainFormat = details.chooseFormat().format;
+    swapChainExtent = details.chooseSwapExtent(window);
+    swapchain = std::make_unique<vki::Swapchain>(
+        *(device.value().get()),
+        physicalDevice.value(),
+        instance.getSurface(),
+        window
+    );
 };
 
-void assertSuccess(const VkResult &result, const std::string message) {
-    if (result != VK_SUCCESS) {
-        throw VulkanError(result, message);
-    };
-};
-
-SwapChainSupportDetails VulkanApplication::queryDeviceSwapChainSupportDetails(
-    const VkPhysicalDevice &pDevice) {
-    SwapChainSupportDetails details;
-    VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        pDevice, instance.getSurface(), &details.capabilities);
-    assertSuccess(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
-    uint32_t formatCount;
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, instance.getSurface(),
-                                                  &formatCount, nullptr);
-    assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
-    details.formats.resize(formatCount);
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        pDevice, instance.getSurface(), &formatCount, details.formats.data());
-    assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
-
-    uint32_t modesCount;
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        pDevice, instance.getSurface(), &modesCount, nullptr);
-    assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
-    details.presentModes.resize(modesCount);
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        pDevice, instance.getSurface(), &modesCount,
-        details.presentModes.data());
-    assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
-    if (details.formats.empty() || details.presentModes.empty()) {
-        throw std::runtime_error("Formats or presentModes are empty");
-    };
-    return details;
-};
-
-VkPresentModeKHR VulkanApplication::choosePresentMode(
-    const SwapChainSupportDetails &details) {
-    for (const auto &presentMode : details.presentModes) {
-        if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return VK_PRESENT_MODE_MAILBOX_KHR;
-        };
-    };
-    return VK_PRESENT_MODE_FIFO_KHR;
-};
-
-VkSurfaceFormatKHR VulkanApplication::chooseFormat(
-    const SwapChainSupportDetails &details) {
-    for (const auto &format : details.formats) {
-        if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return format;
-        };
-    };
-    throw std::runtime_error("Required surface format is not found");
-};
-
-VkExtent2D VulkanApplication::chooseSwapExtent(
-    const VkSurfaceCapabilitiesKHR &capabilities,
-    const GLFWControllerWindow &window) {
-    if (capabilities.currentExtent.width !=
-        std::numeric_limits<uint32_t>::max()) {
-        return capabilities.currentExtent;
-    };
-    int width, height;
-    glfwGetFramebufferSize(window.getGLFWWindow(), &width, &height);
-
-    VkExtent2D actualExtent = { static_cast<uint32_t>(width),
-                                static_cast<uint32_t>(height) };
-    actualExtent.width =
-        std::clamp(actualExtent.width, capabilities.minImageExtent.width,
-                   capabilities.maxImageExtent.width);
-    actualExtent.height =
-        std::clamp(actualExtent.height, capabilities.minImageExtent.height,
-                   capabilities.maxImageExtent.height);
-    return actualExtent;
-};
 
 VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
                                      const GLFWControllerWindow &window)
@@ -266,7 +148,7 @@ void VulkanApplication::drawFrame() {
     assertSuccess(result, "vkResetFences");
 
     uint32_t imageIndex;
-    result = vkAcquireNextImageKHR(device.value()->getVkDevice(), swapChain, UINT64_MAX,
+    result = vkAcquireNextImageKHR(device.value()->getVkDevice(), swapchain.value()->getVkSwapchain(), UINT64_MAX,
                                    imageAvailableSemaphore, VK_NULL_HANDLE,
                                    &imageIndex);
     assertSuccess(result, "vkAcquireNextImageKHR");
@@ -299,7 +181,7 @@ void VulkanApplication::drawFrame() {
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = { swapChain };
+    VkSwapchainKHR swapChains[] = { swapchain.value() -> getVkSwapchain() };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
@@ -519,9 +401,9 @@ void VulkanApplication::createGraphicsPipeline() {
 };
 
 void VulkanApplication::createImageViews() {
-    swapChainImageViews.resize(swapChainImages.size());
+    swapChainImageViews.resize(swapchain.value()->swapChainImages.size());
     int index = 0;
-    for (const auto &image : swapChainImages) {
+    for (const auto &image : swapchain.value()->swapChainImages) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = image;
@@ -558,5 +440,4 @@ VulkanApplication::~VulkanApplication() {
     for (const auto &imageView : swapChainImageViews) {
         vkDestroyImageView(device.value()->getVkDevice(), imageView, nullptr);
     };
-    vkDestroySwapchainKHR(device.value()->getVkDevice(), swapChain, nullptr);
 };

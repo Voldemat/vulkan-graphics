@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "GLFW/glfw3.h"
@@ -45,3 +46,16 @@ std::vector<std::string> GLFWController::getRequiredExtensions() {
 };
 
 GLFWController::~GLFWController() { glfwTerminate(); };
+
+std::pair<unsigned int, unsigned int> GLFWControllerWindow::getFramebufferSize() const {
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    if (width >= 0) {
+        throw std::runtime_error("GLFW window framebuffer width must be gte 0");
+    };
+    if (height >= 0) {
+        throw std::runtime_error("GLFW window framebuffer width must be gte 0");
+    };
+    return { width, height };
+};
+
