@@ -18,6 +18,7 @@
 
 #include "glfw_controller.hpp"
 #include "vulkan_app/vki/base.hpp"
+#include "vulkan_app/vki/command_pool.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
 #include "vulkan_app/vki/instance.hpp"
@@ -72,8 +73,8 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
                                     logicalDevice, imageView);
         }) |
         std::ranges::to<std::vector>();
-    createCommandPool(physicalDevice, logicalDevice);
-    createCommandBuffer(logicalDevice);
+    const auto& commandPool = vki::CommandPool(logicalDevice, physicalDevice);
+    createCommandBuffer(logicalDevice, commandPool);
     createSyncObjects(logicalDevice);
 
     while (!window.shouldClose()) {
@@ -87,29 +88,13 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
     vkDestroySemaphore(logicalDevice.getVkDevice(), renderFinishedSemaphore,
                        nullptr);
     vkDestroyFence(logicalDevice.getVkDevice(), inFlightFence, nullptr);
-    vkDestroyCommandPool(logicalDevice.getVkDevice(), commandPool, nullptr);
-};
-
-void VulkanApplication::createCommandPool(
-    const vki::PhysicalDevice &physicalDevice,
-    const vki::LogicalDevice &logicalDevice) {
-    VkCommandPoolCreateInfo commandPoolCreateInfo{};
-    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    commandPoolCreateInfo.flags =
-        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolCreateInfo.queueFamilyIndex =
-        physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::GRAPHIC);
-    VkResult result =
-        vkCreateCommandPool(logicalDevice.getVkDevice(), &commandPoolCreateInfo,
-                            nullptr, &commandPool);
-    assertSuccess(result, "vkCreateCommandPool");
 };
 
 void VulkanApplication::createCommandBuffer(
-    const vki::LogicalDevice &logicalDevice) {
+    const vki::LogicalDevice &logicalDevice, const vki::CommandPool& commandPool) {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = commandPool.getVkCommandPool();
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 

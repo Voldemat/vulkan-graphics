@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "glfw_controller.hpp"
+#include "vulkan_app/vki/command_pool.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
 #include "vulkan_app/vki/instance.hpp"
@@ -21,7 +22,6 @@ class VulkanApplication {
     vki::VulkanInstance instance;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
-    VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
@@ -35,20 +35,20 @@ class VulkanApplication {
         const vki::LogicalDevice &logicalDevice,
         const vki::RenderPass &renderPass,
         const vki::PipelineLayout &pipelineLayout);
-    void createCommandPool(const vki::PhysicalDevice &physicalDevice,
-                           const vki::LogicalDevice &logicalDevice);
-    void createCommandBuffer(const vki::LogicalDevice &logicalDevice);
-    void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
-                             const vki::RenderPass &renderPass,
-                             const vki::GraphicsPipeline &pipeline);
+    void createCommandBuffer(const vki::LogicalDevice &logicalDevice,
+                             const vki::CommandPool &commandPool);
+    void recordCommandBuffer(
+        const std::shared_ptr<vki::Framebuffer> &framebuffer,
+        const vki::RenderPass &renderPass,
+        const vki::GraphicsPipeline &pipeline);
     void createSyncObjects(const vki::LogicalDevice &logicalDevice);
 
 public:
-    void drawFrame(const vki::LogicalDevice &logicalDevice,
-                   const vki::Swapchain &swapchain,
-                   const vki::RenderPass &renderPass,
-                   const vki::GraphicsPipeline &pipeline,
-                   const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers);
+    void drawFrame(
+        const vki::LogicalDevice &logicalDevice,
+        const vki::Swapchain &swapchain, const vki::RenderPass &renderPass,
+        const vki::GraphicsPipeline &pipeline,
+        const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers);
     VulkanApplication(const VulkanApplication &other) = delete;
     VulkanApplication(vki::VulkanInstanceParams params,
                       const GLFWController &controller,
