@@ -12,7 +12,7 @@ GLFWControllerWindow::GLFWControllerWindow() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
 };
-bool GLFWControllerWindow::shouldClose() {
+bool GLFWControllerWindow::shouldClose() const {
     return glfwWindowShouldClose(window);
 };
 
@@ -32,7 +32,7 @@ GLFWControllerWindow GLFWController::createWindow() {
     return GLFWControllerWindow();
 };
 
-void GLFWController::pollEvents() { glfwPollEvents(); };
+void GLFWController::pollEvents() const { glfwPollEvents(); };
 
 std::vector<std::string> GLFWController::getRequiredExtensions() {
     uint32_t extensionCount = 0;

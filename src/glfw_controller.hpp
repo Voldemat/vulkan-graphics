@@ -11,7 +11,7 @@ class GLFWControllerWindow {
 
 public:
     GLFWControllerWindow();
-    bool shouldClose();
+    bool shouldClose() const;
     GLFWwindow* getGLFWWindow() const noexcept;
     std::pair<unsigned int, unsigned int> getFramebufferSize() const;
     GLFWControllerWindow(const GLFWControllerWindow &other) = delete;
@@ -23,7 +23,7 @@ public:
     GLFWController();
     GLFWController(const GLFWController &other) = delete;
     GLFWControllerWindow createWindow();
-    void pollEvents();
+    void pollEvents() const;
     std::vector<std::string> getRequiredExtensions();
 
     ~GLFWController();

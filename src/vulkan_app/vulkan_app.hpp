@@ -4,56 +4,54 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
-#include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include "glfw_controller.hpp"
+#include "vulkan_app/vki/framebuffer.hpp"
+#include "vulkan_app/vki/graphics_pipeline.hpp"
 #include "vulkan_app/vki/instance.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/pipeline_layout.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 
-
 class VulkanApplication {
     vki::VulkanInstance instance;
-    std::optional<std::unique_ptr<vki::LogicalDevice>> device;
-    std::optional<vki::PhysicalDevice> physicalDevice;
-    std::optional<std::unique_ptr<vki::Swapchain>> swapchain;
-    std::optional<uint32_t> graphicsQueueIndex;
-    std::optional<uint32_t> presentQueueIndex;
-    std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
-    std::optional<std::unique_ptr<vki::RenderPass>> renderPass;
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
-    std::vector<VkFramebuffer> swapChainFrameBuffers;
     VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
     VkFence inFlightFence;
-    void pickPhysicalDevice();
-    void createLogicalDevice();
-    void createSwapChain(const GLFWControllerWindow &window);
-    void createImageViews();
-    void createRenderPass();
-    void createGraphicsPipeline();
-    void createFramebuffers();
-    void createCommandPool();
-    void createCommandBuffer();
-    void recordCommandBuffer(uint32_t imageIndex);
-    void createSyncObjects();
-    VkShaderModule createShaderModule(const std::vector<char> &code);
+    const vki::PhysicalDevice pickPhysicalDevice();
+    const vki::Swapchain createSwapChain(
+        const vki::PhysicalDevice &physicalDevice,
+        const vki::LogicalDevice &logicalDevice,
+        const GLFWControllerWindow &window);
+    vki::GraphicsPipeline createGraphicsPipeline(
+        const vki::LogicalDevice &logicalDevice,
+        const vki::RenderPass &renderPass,
+        const vki::PipelineLayout &pipelineLayout);
+    void createCommandPool(const vki::PhysicalDevice &physicalDevice,
+                           const vki::LogicalDevice &logicalDevice);
+    void createCommandBuffer(const vki::LogicalDevice &logicalDevice);
+    void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
+                             const vki::RenderPass &renderPass,
+                             const vki::GraphicsPipeline &pipeline);
+    void createSyncObjects(const vki::LogicalDevice &logicalDevice);
 
 public:
-    void drawFrame();
+    void drawFrame(const vki::LogicalDevice &logicalDevice,
+                   const vki::Swapchain &swapchain,
+                   const vki::RenderPass &renderPass,
+                   const vki::GraphicsPipeline &pipeline,
+                   const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers);
     VulkanApplication(const VulkanApplication &other) = delete;
     VulkanApplication(vki::VulkanInstanceParams params,
+                      const GLFWController &controller,
                       const GLFWControllerWindow &window);
-    ~VulkanApplication();
 };
 #endif

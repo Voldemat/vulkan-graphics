@@ -6,13 +6,16 @@
 #include "glfw_controller.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
+
 namespace vki {
 
 class Swapchain {
     const VkDevice device;
     VkSwapchainKHR vkSwapchain;
+    void createImageViews(const vki::LogicalDevice& logicalDevice, const VkFormat& format);
 public:
     std::vector<VkImage> swapChainImages;
+    std::vector<VkImageView> swapChainImageViews;
     explicit Swapchain(
         const vki::LogicalDevice& logicalDevice,
         const vki::PhysicalDevice& physicalDevice,

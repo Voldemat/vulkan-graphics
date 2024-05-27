@@ -14,10 +14,6 @@ int main() {
         .apiVersion = VK_API_VERSION_1_3,
         .layers = { "VK_LAYER_KHRONOS_validation" },
     };
-    VulkanApplication application(params, window);
-    while (!window.shouldClose()) {
-        controller.pollEvents();
-        application.drawFrame();
-    };
+    VulkanApplication application(params, controller, window);
     return 0;
 };
