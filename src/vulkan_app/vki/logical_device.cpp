@@ -69,3 +69,8 @@ vki::LogicalDevice::LogicalDevice(vki::LogicalDevice &&other) {
 const VkDevice vki::LogicalDevice::getVkDevice() const noexcept {
     return device;
 };
+
+
+void vki::LogicalDevice::waitIdle() const {
+    vkDeviceWaitIdle(device);
+};

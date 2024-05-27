@@ -18,7 +18,9 @@
 
 #include "glfw_controller.hpp"
 #include "vulkan_app/vki/base.hpp"
+#include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
+#include "vulkan_app/vki/fence.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
 #include "vulkan_app/vki/instance.hpp"
@@ -26,6 +28,7 @@
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/pipeline_layout.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
+#include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/shader_module.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 
@@ -69,46 +72,35 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
         swapchain.swapChainImageViews |
         std::views::transform([&swapchain, &renderPass, &logicalDevice,
                                this](const auto &imageView) {
-            return std::make_shared<vki::Framebuffer>(swapchain, renderPass, swapChainExtent,
-                                    logicalDevice, imageView);
+            return std::make_shared<vki::Framebuffer>(swapchain, renderPass,
+                                                      swapChainExtent,
+                                                      logicalDevice, imageView);
         }) |
         std::ranges::to<std::vector>();
-    const auto& commandPool = vki::CommandPool(logicalDevice, physicalDevice);
-    createCommandBuffer(logicalDevice, commandPool);
-    createSyncObjects(logicalDevice);
+    const auto &commandPool = vki::CommandPool(logicalDevice, physicalDevice);
+    const auto &commandBuffer = commandPool.createCommandBuffer();
+    const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);
+    const auto &renderFinishedSemaphore = vki::Semaphore(logicalDevice);
+    const auto &inFlightFence = vki::Fence(logicalDevice);
 
     while (!window.shouldClose()) {
         controller.pollEvents();
-        drawFrame(logicalDevice, swapchain, renderPass, pipeline, framebuffers);
+        drawFrame(logicalDevice, swapchain, renderPass, pipeline, framebuffers,
+                  commandBuffer, inFlightFence, imageAvailableSemaphore,
+                  renderFinishedSemaphore);
     };
 
-    vkDeviceWaitIdle(logicalDevice.getVkDevice());
-    vkDestroySemaphore(logicalDevice.getVkDevice(), imageAvailableSemaphore,
-                       nullptr);
-    vkDestroySemaphore(logicalDevice.getVkDevice(), renderFinishedSemaphore,
-                       nullptr);
-    vkDestroyFence(logicalDevice.getVkDevice(), inFlightFence, nullptr);
-};
-
-void VulkanApplication::createCommandBuffer(
-    const vki::LogicalDevice &logicalDevice, const vki::CommandPool& commandPool) {
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool.getVkCommandPool();
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
-
-    VkResult result = vkAllocateCommandBuffers(logicalDevice.getVkDevice(),
-                                               &allocInfo, &commandBuffer);
-    assertSuccess(result, "vkAllocateCommandBuffers");
+    logicalDevice.waitIdle();
 };
 
 void VulkanApplication::recordCommandBuffer(
-    const std::shared_ptr<vki::Framebuffer> &framebuffer, const vki::RenderPass &renderPass,
-    const vki::GraphicsPipeline &pipeline) {
+    const std::shared_ptr<vki::Framebuffer> &framebuffer,
+    const vki::RenderPass &renderPass, const vki::GraphicsPipeline &pipeline,
+    const vki::CommandBuffer &commandBuffer) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    VkResult result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    VkResult result =
+        vkBeginCommandBuffer(commandBuffer.getVkCommandBuffer(), &beginInfo);
     assertSuccess(result, "vkBeginCommandBuffer");
 
     VkRenderPassBeginInfo renderPassInfo{};
@@ -122,76 +114,59 @@ void VulkanApplication::recordCommandBuffer(
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
+    vkCmdBeginRenderPass(commandBuffer.getVkCommandBuffer(), &renderPassInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    vkCmdBindPipeline(commandBuffer.getVkCommandBuffer(),
+                      VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipeline.getVkPipeline());
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-    vkCmdEndRenderPass(commandBuffer);
-    result = vkEndCommandBuffer(commandBuffer);
+    vkCmdDraw(commandBuffer.getVkCommandBuffer(), 3, 1, 0, 0);
+    vkCmdEndRenderPass(commandBuffer.getVkCommandBuffer());
+    result = vkEndCommandBuffer(commandBuffer.getVkCommandBuffer());
     assertSuccess(result, "vkEndCommandBuffer");
-};
-
-void VulkanApplication::createSyncObjects(
-    const vki::LogicalDevice &logicalDevice) {
-    VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    VkFenceCreateInfo fenceInfo{};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-    VkResult result =
-        vkCreateSemaphore(logicalDevice.getVkDevice(), &semaphoreInfo, nullptr,
-                          &imageAvailableSemaphore);
-    assertSuccess(result, "vkCreateSemaphore - imageAvailableSemaphore");
-    result = vkCreateSemaphore(logicalDevice.getVkDevice(), &semaphoreInfo,
-                               nullptr, &renderFinishedSemaphore);
-    assertSuccess(result, "vkCreateSemaphore - renderFinishedSemaphore");
-    result = vkCreateFence(logicalDevice.getVkDevice(), &fenceInfo, nullptr,
-                           &inFlightFence);
-    assertSuccess(result, "vkCreateFence");
 };
 
 void VulkanApplication::drawFrame(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
     const vki::RenderPass &renderPass, const vki::GraphicsPipeline &pipeline,
-    const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers) {
-    VkResult result = vkWaitForFences(logicalDevice.getVkDevice(), 1,
-                                      &inFlightFence, VK_TRUE, UINT64_MAX);
-    assertSuccess(result, "vkWaitForFences");
-    result = vkResetFences(logicalDevice.getVkDevice(), 1, &inFlightFence);
-    assertSuccess(result, "vkResetFences");
+    const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers,
+    const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
+    const vki::Semaphore &imageAvailableSemaphore,
+    const vki::Semaphore &renderFinishedSemaphore) {
+    inFlightFence.wait();
 
     uint32_t imageIndex;
-    result = vkAcquireNextImageKHR(
+    VkResult result = vkAcquireNextImageKHR(
         logicalDevice.getVkDevice(), swapchain.getVkSwapchain(), UINT64_MAX,
-        imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+        imageAvailableSemaphore.getVkSemaphore(), VK_NULL_HANDLE, &imageIndex);
     assertSuccess(result, "vkAcquireNextImageKHR");
-    result = vkResetCommandBuffer(commandBuffer, 0);
+    result = vkResetCommandBuffer(commandBuffer.getVkCommandBuffer(), 0);
     assertSuccess(result, "vkResetCommandBuffer");
-    recordCommandBuffer(framebuffers[imageIndex], renderPass, pipeline);
+    recordCommandBuffer(framebuffers[imageIndex], renderPass, pipeline,
+                        commandBuffer);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
+    VkSemaphore waitSemaphores[] = { imageAvailableSemaphore.getVkSemaphore() };
     VkPipelineStageFlags waitStages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
     };
+    VkCommandBuffer buffer = commandBuffer.getVkCommandBuffer();
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.pCommandBuffers = &buffer;
 
-    VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+    VkSemaphore signalSemaphores[] = {
+        renderFinishedSemaphore.getVkSemaphore()
+    };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     result = vkQueueSubmit(logicalDevice.graphicsQueue, 1, &submitInfo,
-                           inFlightFence);
+                           inFlightFence.getVkFence());
     assertSuccess(result, "vkQueueSubmit");
 
     VkPresentInfoKHR presentInfo{};

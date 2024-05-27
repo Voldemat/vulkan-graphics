@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "vulkan_app/vki/base.hpp"
+#include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
 
@@ -23,6 +24,11 @@ vki::CommandPool::CommandPool(const vki::LogicalDevice &logicalDevice,
 
 const VkCommandPool vki::CommandPool::getVkCommandPool() const {
     return vkCommandPool;
+};
+
+
+vki::CommandBuffer vki::CommandPool::createCommandBuffer() const {
+    return vki::CommandBuffer(vkCommandPool, device);
 };
 
 vki::CommandPool::~CommandPool() {

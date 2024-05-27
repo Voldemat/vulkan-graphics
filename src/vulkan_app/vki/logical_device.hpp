@@ -16,6 +16,7 @@ public:
     explicit LogicalDevice(const vki::PhysicalDevice &physicalDevice);
     LogicalDevice(LogicalDevice &&other);
     const VkDevice getVkDevice() const noexcept;
+    void waitIdle() const;
     ~LogicalDevice();
 };
 
