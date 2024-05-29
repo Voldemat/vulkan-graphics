@@ -10,6 +10,7 @@ public:
     const VkCommandBuffer getVkCommandBuffer() const;
     CommandBuffer(const CommandBuffer&) = delete;
     CommandBuffer(const CommandBuffer&&) = delete;
+    void reset() const;
 };
 };
 #endif

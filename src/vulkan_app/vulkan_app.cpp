@@ -5,8 +5,10 @@
 #include <vulkan/vulkan_metal.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -17,7 +19,10 @@
 #include <vector>
 
 #include "glfw_controller.hpp"
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
 #include "vulkan_app/vki/base.hpp"
+#include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
 #include "vulkan_app/vki/fence.hpp"
@@ -25,14 +30,49 @@
 #include "vulkan_app/vki/graphics_pipeline.hpp"
 #include "vulkan_app/vki/instance.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
+#include "vulkan_app/vki/memory.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/pipeline_layout.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/shader_module.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
+#include "vulkan_app/vki/utils.hpp"
 
 using namespace vki;
+
+struct Vertex {
+    glm::vec2 pos;
+    glm::vec3 color;
+
+    static VkVertexInputBindingDescription getBindingDescription() {
+        return { .binding = 0,
+                 .stride = sizeof(Vertex),
+                 .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
+    };
+
+    static std::array<VkVertexInputAttributeDescription, 2>
+    getAttributeDescriptions() {
+        return {
+            (VkVertexInputAttributeDescription){
+                .location = 0,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32_SFLOAT,
+                .offset = offsetof(Vertex, pos) },
+            (VkVertexInputAttributeDescription){
+                .location = 1,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(Vertex, color) },
+        };
+    };
+};
+
+const std::vector<Vertex> vertices = {
+    { .pos = { 0.0f, -0.5f }, .color = { 1.0f, 0.0f, 0.0f } },
+    { .pos = { 0.5f, 0.5f }, .color = { 1.0f, 1.0f, 0.0f } },
+    { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f } }
+};
 
 const vki::PhysicalDevice VulkanApplication::pickPhysicalDevice() {
     const auto &devices = instance.getPhysicalDevices();
@@ -78,6 +118,29 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
         }) |
         std::ranges::to<std::vector>();
     const auto &commandPool = vki::CommandPool(logicalDevice, physicalDevice);
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    auto vertexBuffer = vki::Buffer(logicalDevice, bufferInfo);
+    const auto &memoryRequirements = vertexBuffer.getMemoryRequirements();
+    const auto &memoryProperties = physicalDevice.getMemoryProperties();
+    const auto &memoryTypeIndex = utils::findMemoryType(
+        memoryRequirements.memoryTypeBits, memoryProperties,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memoryRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+    const auto &vertexBufferMemory =
+        std::make_shared<vki::Memory>(logicalDevice, allocInfo);
+    vertexBuffer.bindMemory(vertexBufferMemory);
+    void *data;
+    vertexBufferMemory->mapMemory(bufferInfo.size, &data);
+    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+    vertexBufferMemory->unmapMemory();
     const auto &commandBuffer = commandPool.createCommandBuffer();
     const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);
     const auto &renderFinishedSemaphore = vki::Semaphore(logicalDevice);
@@ -87,7 +150,7 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
         controller.pollEvents();
         drawFrame(logicalDevice, swapchain, renderPass, pipeline, framebuffers,
                   commandBuffer, inFlightFence, imageAvailableSemaphore,
-                  renderFinishedSemaphore);
+                  renderFinishedSemaphore, vertexBuffer);
     };
 
     logicalDevice.waitIdle();
@@ -96,7 +159,7 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
 void VulkanApplication::recordCommandBuffer(
     const std::shared_ptr<vki::Framebuffer> &framebuffer,
     const vki::RenderPass &renderPass, const vki::GraphicsPipeline &pipeline,
-    const vki::CommandBuffer &commandBuffer) {
+    const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     VkResult result =
@@ -120,6 +183,10 @@ void VulkanApplication::recordCommandBuffer(
     vkCmdBindPipeline(commandBuffer.getVkCommandBuffer(),
                       VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipeline.getVkPipeline());
+    VkBuffer vertexBuffers[] = { vertexBuffer.getVkBuffer() };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer.getVkCommandBuffer(), 0, 1,
+                           vertexBuffers, offsets);
     vkCmdDraw(commandBuffer.getVkCommandBuffer(), 3, 1, 0, 0);
     vkCmdEndRenderPass(commandBuffer.getVkCommandBuffer());
     result = vkEndCommandBuffer(commandBuffer.getVkCommandBuffer());
@@ -132,18 +199,15 @@ void VulkanApplication::drawFrame(
     const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers,
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
-    const vki::Semaphore &renderFinishedSemaphore) {
+    const vki::Semaphore &renderFinishedSemaphore,
+    const vki::Buffer &vertexBuffer) {
     inFlightFence.wait();
 
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(
-        logicalDevice.getVkDevice(), swapchain.getVkSwapchain(), UINT64_MAX,
-        imageAvailableSemaphore.getVkSemaphore(), VK_NULL_HANDLE, &imageIndex);
-    assertSuccess(result, "vkAcquireNextImageKHR");
-    result = vkResetCommandBuffer(commandBuffer.getVkCommandBuffer(), 0);
-    assertSuccess(result, "vkResetCommandBuffer");
+    uint32_t imageIndex =
+        swapchain.acquireNextImageKHR(imageAvailableSemaphore);
+    commandBuffer.reset();
     recordCommandBuffer(framebuffers[imageIndex], renderPass, pipeline,
-                        commandBuffer);
+                        commandBuffer, vertexBuffer);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -165,8 +229,8 @@ void VulkanApplication::drawFrame(
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    result = vkQueueSubmit(logicalDevice.graphicsQueue, 1, &submitInfo,
-                           inFlightFence.getVkFence());
+    VkResult result = vkQueueSubmit(logicalDevice.graphicsQueue, 1, &submitInfo,
+                                    inFlightFence.getVkFence());
     assertSuccess(result, "vkQueueSubmit");
 
     VkPresentInfoKHR presentInfo{};
@@ -183,7 +247,7 @@ void VulkanApplication::drawFrame(
     assertSuccess(result, "vkQueuePresentKHR");
 };
 
-static std::vector<char> readFile(const std::string &filename) {
+std::vector<char> readFile(const std::string &filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("failed to open file: " + filename);
@@ -203,6 +267,16 @@ vki::GraphicsPipeline VulkanApplication::createGraphicsPipeline(
     auto fragmentShaderCode = readFile("../src/shaders/fragment.spv");
     auto vertShader = vki::ShaderModule(logicalDevice, vertShaderCode);
     auto fragmentShader = vki::ShaderModule(logicalDevice, fragmentShaderCode);
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+    VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &bindingDescription,
+        .vertexAttributeDescriptionCount = attributeDescriptions.size(),
+        .pVertexAttributeDescriptions = attributeDescriptions.data()
+    };
     return vki::GraphicsPipeline(vertShader, fragmentShader, swapChainExtent,
-                                 pipelineLayout, renderPass, logicalDevice);
+                                 pipelineLayout, renderPass, logicalDevice,
+                                 vertexInputCreateInfo);
 };

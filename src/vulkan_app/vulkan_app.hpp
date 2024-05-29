@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "glfw_controller.hpp"
+#include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/fence.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
@@ -37,7 +38,8 @@ class VulkanApplication {
         const std::shared_ptr<vki::Framebuffer> &framebuffer,
         const vki::RenderPass &renderPass,
         const vki::GraphicsPipeline &pipeline,
-        const vki::CommandBuffer &commandBuffer);
+        const vki::CommandBuffer &commandBuffer,
+        const vki::Buffer &vertexBuffer);
 
 public:
     void drawFrame(
@@ -48,7 +50,8 @@ public:
         const vki::CommandBuffer &commandBuffer,
         const vki::Fence &inFlightFence,
         const vki::Semaphore &imageAvailableSemaphore,
-        const vki::Semaphore &renderFinishedSemaphore
+        const vki::Semaphore &renderFinishedSemaphore,
+        const vki::Buffer &vertexBuffer
 
     );
     VulkanApplication(const VulkanApplication &other) = delete;

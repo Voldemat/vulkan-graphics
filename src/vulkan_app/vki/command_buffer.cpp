@@ -20,3 +20,8 @@ vki::CommandBuffer::CommandBuffer(const VkCommandPool &commandPool,
 const VkCommandBuffer vki::CommandBuffer::getVkCommandBuffer() const {
     return vkCommandBuffer;
 };
+
+void vki::CommandBuffer::reset() const {
+    VkResult result = vkResetCommandBuffer(vkCommandBuffer, 0);
+    assertSuccess(result, "vkResetCommandBuffer");
+};

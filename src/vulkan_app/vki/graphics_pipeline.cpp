@@ -12,8 +12,8 @@ vki::GraphicsPipeline::GraphicsPipeline(
     const vki::ShaderModule &vertShader,
     const vki::ShaderModule &fragmentShader, VkExtent2D extent,
     const vki::PipelineLayout &pipelineLayout,
-    const vki::RenderPass &renderPass, const vki::LogicalDevice &logicalDevice
-
+    const vki::RenderPass &renderPass, const vki::LogicalDevice &logicalDevice,
+    VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo
     )
     : device{ logicalDevice.getVkDevice() } {
     VkPipelineShaderStageCreateInfo vertexShaderCreateInfo{};
@@ -34,13 +34,6 @@ vki::GraphicsPipeline::GraphicsPipeline(
         vertexShaderCreateInfo, fragmentShaderCreateInfo
     };
 
-    VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo{};
-    vertexInputCreateInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-    vertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
 
     VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyCreateInfo{};
     pipelineInputAssemblyCreateInfo.sType =
@@ -107,7 +100,7 @@ vki::GraphicsPipeline::GraphicsPipeline(
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInputCreateInfo;
+    pipelineInfo.pVertexInputState = &vertexInputStateCreateInfo;
     pipelineInfo.pInputAssemblyState = &pipelineInputAssemblyCreateInfo;
     pipelineInfo.pViewportState = &viewportCreateInfo;
     pipelineInfo.pRasterizationState = &rasterizer;

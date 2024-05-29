@@ -10,13 +10,15 @@ namespace vki {
 class GraphicsPipeline {
     VkPipeline vkPipeline;
     VkDevice device;
+
 public:
-    explicit GraphicsPipeline(const vki::ShaderModule &vertShader,
-                              const vki::ShaderModule &fragmentShader,
-                              VkExtent2D extent,
-                              const vki::PipelineLayout &pipelineLayout,
-                              const vki::RenderPass &renderPass,
-                              const vki::LogicalDevice &logicalDevice);
+    explicit GraphicsPipeline(
+        const vki::ShaderModule &vertShader,
+        const vki::ShaderModule &fragmentShader, VkExtent2D extent,
+        const vki::PipelineLayout &pipelineLayout,
+        const vki::RenderPass &renderPass,
+        const vki::LogicalDevice &logicalDevice,
+        VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo);
     VkPipeline getVkPipeline() const;
     ~GraphicsPipeline();
 };

@@ -3,12 +3,14 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 #include "./base.hpp"
 #include "./logical_device.hpp"
 #include "./physical_device.hpp"
 #include "glfw_controller.hpp"
+#include "vulkan_app/vki/semaphore.hpp"
 
 vki::Swapchain::Swapchain(const vki::LogicalDevice &logicalDevice,
                           const vki::PhysicalDevice &physicalDevice,
@@ -92,6 +94,16 @@ void vki::Swapchain::createImageViews(const vki::LogicalDevice &logicalDevice,
         assertSuccess(result, "vkCreateImageView");
         index++;
     };
+};
+
+uint32_t vki::Swapchain::acquireNextImageKHR(
+    const vki::Semaphore &semaphore) const {
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        device, vkSwapchain, std::numeric_limits<uint32_t>::max(),
+        semaphore.getVkSemaphore(), VK_NULL_HANDLE, &imageIndex);
+    assertSuccess(result, "vkAcquireNextImageKHR");
+    return imageIndex;
 };
 
 vki::Swapchain::~Swapchain() {

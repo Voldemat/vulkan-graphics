@@ -168,3 +168,10 @@ uint32_t vki::SwapChainSupportDetails::getImageCount() const {
     };
     return imageCount;
 };
+
+
+VkPhysicalDeviceMemoryProperties vki::PhysicalDevice::getMemoryProperties() const {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(device, &memProperties);
+    return memProperties;
+};

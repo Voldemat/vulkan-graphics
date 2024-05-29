@@ -36,6 +36,8 @@ public:
     bool isSuitable() const;
     unsigned int getFamilyTypeIndex(QueueFamilyType type) const;
 
+    VkPhysicalDeviceMemoryProperties getMemoryProperties() const;
+
     VkSurfaceCapabilitiesKHR getSurfaceCapabilities(const VkSurfaceKHR &surface) const;
     std::vector<VkSurfaceFormatKHR> getSurfaceFormats(const VkSurfaceKHR& surface) const;
     std::vector<VkPresentModeKHR> getSurfacePresentModes(const VkSurfaceKHR& surface) const;
