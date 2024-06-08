@@ -33,6 +33,7 @@
 #include "vulkan_app/vki/memory.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/pipeline_layout.hpp"
+#include "vulkan_app/vki/queue.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/shader_module.hpp"
@@ -102,6 +103,10 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
     : instance{ params, window } {
     const vki::PhysicalDevice &physicalDevice = pickPhysicalDevice();
     const auto logicalDevice = vki::LogicalDevice(physicalDevice);
+    const auto &graphicsQueue =
+        vki::GraphicsQueue(logicalDevice, logicalDevice.graphicsQueueIndex);
+    const auto &presentQueue =
+        vki::PresentQueue(logicalDevice, logicalDevice.presentQueueIndex);
     const vki::Swapchain &swapchain =
         createSwapChain(physicalDevice, logicalDevice, window);
     const auto renderPass = vki::RenderPass(swapChainFormat, logicalDevice);
@@ -150,7 +155,8 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
         controller.pollEvents();
         drawFrame(logicalDevice, swapchain, renderPass, pipeline, framebuffers,
                   commandBuffer, inFlightFence, imageAvailableSemaphore,
-                  renderFinishedSemaphore, vertexBuffer);
+                  renderFinishedSemaphore, vertexBuffer, graphicsQueue,
+                  presentQueue);
     };
 
     logicalDevice.waitIdle();
@@ -200,7 +206,8 @@ void VulkanApplication::drawFrame(
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
     const vki::Semaphore &renderFinishedSemaphore,
-    const vki::Buffer &vertexBuffer) {
+    const vki::Buffer &vertexBuffer, const vki::GraphicsQueue &graphicsQueue,
+    const vki::PresentQueue &presentQueue) {
     inFlightFence.wait();
 
     uint32_t imageIndex =
@@ -209,42 +216,36 @@ void VulkanApplication::drawFrame(
     recordCommandBuffer(framebuffers[imageIndex], renderPass, pipeline,
                         commandBuffer, vertexBuffer);
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
     VkSemaphore waitSemaphores[] = { imageAvailableSemaphore.getVkSemaphore() };
     VkPipelineStageFlags waitStages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
     };
-    VkCommandBuffer buffer = commandBuffer.getVkCommandBuffer();
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &buffer;
+    const auto &buffer = commandBuffer.getVkCommandBuffer();
 
     VkSemaphore signalSemaphores[] = {
         renderFinishedSemaphore.getVkSemaphore()
     };
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
 
-    VkResult result = vkQueueSubmit(logicalDevice.graphicsQueue, 1, &submitInfo,
-                                    inFlightFence.getVkFence());
-    assertSuccess(result, "vkQueueSubmit");
+    VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                                .waitSemaphoreCount = 1,
+                                .pWaitSemaphores = waitSemaphores,
+                                .pWaitDstStageMask = waitStages,
+                                .commandBufferCount = 1,
+                                .pCommandBuffers = &buffer,
+                                .signalSemaphoreCount = 1,
+                                .pSignalSemaphores = signalSemaphores };
 
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+    graphicsQueue.submit({ submitInfo }, &inFlightFence);
 
     VkSwapchainKHR swapChains[] = { swapchain.getVkSwapchain() };
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-
-    result = vkQueuePresentKHR(logicalDevice.presentQueue, &presentInfo);
-    assertSuccess(result, "vkQueuePresentKHR");
+    VkPresentInfoKHR presentInfo = { .sType =
+                                         VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                                     .waitSemaphoreCount = 1,
+                                     .pWaitSemaphores = signalSemaphores,
+                                     .swapchainCount = 1,
+                                     .pSwapchains = swapChains,
+                                     .pImageIndices = &imageIndex };
+    presentQueue.present(presentInfo);
 };
 
 std::vector<char> readFile(const std::string &filename) {

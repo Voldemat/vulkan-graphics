@@ -9,7 +9,6 @@
 
 vki::LogicalDevice::LogicalDevice(const vki::PhysicalDevice &physicalDevice) {
     float queuePriority = 1.0f;
-    unsigned int graphicsQueueIndex, presentQueueIndex;
     graphicsQueueIndex =
         physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::GRAPHIC);
     presentQueueIndex =
@@ -54,16 +53,12 @@ vki::LogicalDevice::LogicalDevice(const vki::PhysicalDevice &physicalDevice) {
     if (result != VK_SUCCESS) {
         throw VulkanError(result, "vkCreateDevice");
     };
-    vkGetDeviceQueue(device, graphicsQueueIndex, 0, &graphicsQueue);
-    vkGetDeviceQueue(device, presentQueueIndex, 0, &presentQueue);
 };
 
 vki::LogicalDevice::~LogicalDevice() { vkDestroyDevice(device, nullptr); };
 
 vki::LogicalDevice::LogicalDevice(vki::LogicalDevice &&other) {
     device = other.device;
-    graphicsQueue = other.graphicsQueue;
-    presentQueue = other.presentQueue;
 };
 
 const VkDevice vki::LogicalDevice::getVkDevice() const noexcept {

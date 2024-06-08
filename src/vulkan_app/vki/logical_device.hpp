@@ -2,6 +2,7 @@
 #define VKI_LOGICAL_DEVICE
 
 #include <vulkan/vulkan_core.h>
+#include <cstdint>
 
 #include "./physical_device.hpp"
 
@@ -9,10 +10,9 @@ namespace vki {
 class LogicalDevice {
     VkDevice device;
     LogicalDevice(const LogicalDevice &other) = delete;
-
 public:
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
+    uint32_t graphicsQueueIndex;
+    uint32_t presentQueueIndex;
     explicit LogicalDevice(const vki::PhysicalDevice &physicalDevice);
     LogicalDevice(LogicalDevice &&other);
     const VkDevice getVkDevice() const noexcept;

@@ -8,6 +8,8 @@ class Fence {
     VkDevice device;
 public:
     explicit Fence(const vki::LogicalDevice& logicalDevice);
+    Fence(const Fence&) = delete;
+    Fence(const Fence&&) = delete;
     const VkFence getVkFence() const;
     void wait() const;
     ~Fence();

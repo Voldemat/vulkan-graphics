@@ -17,6 +17,7 @@
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/pipeline_layout.hpp"
+#include "vulkan_app/vki/queue.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
@@ -51,8 +52,9 @@ public:
         const vki::Fence &inFlightFence,
         const vki::Semaphore &imageAvailableSemaphore,
         const vki::Semaphore &renderFinishedSemaphore,
-        const vki::Buffer &vertexBuffer
-
+        const vki::Buffer &vertexBuffer,
+        const vki::GraphicsQueue& graphicsQueue,
+        const vki::PresentQueue& presentQueue
     );
     VulkanApplication(const VulkanApplication &other) = delete;
     VulkanApplication(vki::VulkanInstanceParams params,
