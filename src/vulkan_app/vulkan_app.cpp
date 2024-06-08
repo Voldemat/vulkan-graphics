@@ -37,6 +37,7 @@
 #include "vulkan_app/vki/render_pass.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/shader_module.hpp"
+#include "vulkan_app/vki/structs.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 #include "vulkan_app/vki/utils.hpp"
 
@@ -216,35 +217,18 @@ void VulkanApplication::drawFrame(
     recordCommandBuffer(framebuffers[imageIndex], renderPass, pipeline,
                         commandBuffer, vertexBuffer);
 
-    VkSemaphore waitSemaphores[] = { imageAvailableSemaphore.getVkSemaphore() };
-    VkPipelineStageFlags waitStages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    };
-    const auto &buffer = commandBuffer.getVkCommandBuffer();
-
-    VkSemaphore signalSemaphores[] = {
-        renderFinishedSemaphore.getVkSemaphore()
-    };
-
-    VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                                .waitSemaphoreCount = 1,
-                                .pWaitSemaphores = waitSemaphores,
-                                .pWaitDstStageMask = waitStages,
-                                .commandBufferCount = 1,
-                                .pCommandBuffers = &buffer,
-                                .signalSemaphoreCount = 1,
-                                .pSignalSemaphores = signalSemaphores };
-
+    const vki::SubmitInfo submitInfo(
+        { .waitSemaphores = { &imageAvailableSemaphore },
+          .signalSemaphores = { &renderFinishedSemaphore },
+          .commandBuffers = { &commandBuffer },
+          .waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT } });
     graphicsQueue.submit({ submitInfo }, &inFlightFence);
 
-    VkSwapchainKHR swapChains[] = { swapchain.getVkSwapchain() };
-    VkPresentInfoKHR presentInfo = { .sType =
-                                         VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-                                     .waitSemaphoreCount = 1,
-                                     .pWaitSemaphores = signalSemaphores,
-                                     .swapchainCount = 1,
-                                     .pSwapchains = swapChains,
-                                     .pImageIndices = &imageIndex };
+    vki::PresentInfo presentInfo({
+        .waitSemaphores = { &renderFinishedSemaphore },
+        .swapchains = { &swapchain },
+        .imageIndices = { imageIndex }
+    });
     presentQueue.present(presentInfo);
 };
 

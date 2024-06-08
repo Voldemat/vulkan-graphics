@@ -8,6 +8,7 @@
 
 #include "./fence.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
+#include "vulkan_app/vki/structs.hpp"
 
 namespace vki {
 class Queue {
@@ -22,13 +23,13 @@ public:
 class GraphicsQueue : public Queue {
     using Queue::Queue;
 public:
-    void submit(const std::vector<VkSubmitInfo>& submitInfos,
+    void submit(const std::vector<const vki::SubmitInfo>& submitInfos,
                 const std::optional<const vki::Fence*> &fence) const;
 };
 
 class PresentQueue : public Queue {
     using Queue::Queue;
 public:
-    void present(const VkPresentInfoKHR& presentInfo) const;
+    void present(const vki::PresentInfo& presentInfo) const;
 };
 };  // namespace vki
