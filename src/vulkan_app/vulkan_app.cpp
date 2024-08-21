@@ -103,7 +103,7 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
                                      const GLFWControllerWindow &window)
     : instance{ params, window } {
     const vki::PhysicalDevice &physicalDevice = pickPhysicalDevice();
-    const auto logicalDevice = vki::LogicalDevice(physicalDevice);
+    const vki::LogicalDevice logicalDevice = vki::LogicalDevice(physicalDevice);
     const auto &graphicsQueue =
         vki::GraphicsQueue(logicalDevice, logicalDevice.graphicsQueueIndex);
     const auto &presentQueue =

@@ -12,12 +12,8 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(Vulkan REQUIRED)
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw.cmake")
-FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG ${IGG_GLM_TAG}
-)
-FetchContent_MakeAvailable(glm)
+include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/easyloggingpp.cmake")
 file(GLOB_RECURSE GRAPHICS_HEADERS src/*.hpp src/*.h)
 file(GLOB_RECURSE GRAPHICS_SOURCES src/*.cpp src/*.c)
 add_executable(
@@ -31,6 +27,7 @@ target_include_directories(
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/
     PRIVATE ${GLFW_INCLUDE_DIRS}
-    PUBLIC ${Vulkan_INCLUDE_DIRS}
+    PRIVATE ${EASYLOGGINGPP_INCLUDE_DIRECTORIES}
+    PRIVATE ${Vulkan_INCLUDE_DIRS}
 )
-target_link_libraries(main glfw Vulkan::Vulkan glm)
+target_link_libraries(main glfw Vulkan::Vulkan glm easyloggingpp)

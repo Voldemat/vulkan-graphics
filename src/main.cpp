@@ -4,6 +4,10 @@
 #include "./vulkan_app/vulkan_app.hpp"
 #include "vulkan_app/vki/instance.hpp"
 
+#include "easylogging++.h"
+
+INITIALIZE_EASYLOGGINGPP
+
 int main() {
     GLFWController controller;
     GLFWControllerWindow window = controller.createWindow();
