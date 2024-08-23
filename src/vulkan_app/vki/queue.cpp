@@ -13,8 +13,9 @@
 #include "vulkan_app/vki/structs.hpp"
 
 vki::Queue::Queue(const vki::LogicalDevice &logicalDevice,
-                  const uint32_t queueIndex) {
-    vkGetDeviceQueue(logicalDevice.getVkDevice(), queueIndex, 0, &queue);
+                  const uint32_t queueFamilyIndex)
+    : queueFamilyIndex{ queueFamilyIndex } {
+    vkGetDeviceQueue(logicalDevice.getVkDevice(), queueFamilyIndex, 0, &queue);
 };
 
 const VkQueue vki::Queue::getVkQueue() const { return queue; };
@@ -35,7 +36,7 @@ void vki::GraphicsQueue::submit(
 };
 
 void vki::PresentQueue::present(const vki::PresentInfo &presentInfo) const {
-    const auto& finalInfo = presentInfo.getVkPresentInfo();
+    const auto &finalInfo = presentInfo.getVkPresentInfo();
     VkResult result = vkQueuePresentKHR(queue, &finalInfo);
     vki::assertSuccess(result, "vkQueuePresentKHR");
 };

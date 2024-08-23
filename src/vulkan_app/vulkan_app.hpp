@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 
+#define ELPP_STL_LOGGING
+#include "easylogging++.h"
 #include "glfw_controller.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
@@ -24,6 +26,7 @@
 
 class VulkanApplication {
     vki::VulkanInstance instance;
+    el::Logger* logger;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
     const vki::PhysicalDevice pickPhysicalDevice();

@@ -1,5 +1,4 @@
-#ifndef VKI_UTILS
-#define VKI_UTILS
+#pragma once
 
 #include <vulkan/vulkan_core.h>
 
@@ -12,4 +11,3 @@ uint32_t findMemoryType(uint32_t typeFilter,
                         VkMemoryPropertyFlags properties);
 };
 };  // namespace vki
-#endif

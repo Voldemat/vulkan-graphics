@@ -1,15 +1,29 @@
-#ifndef VKI_PHYSICAL_DEVICE
-#define VKI_PHYSICAL_DEVICE
+#pragma once
 
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <map>
+#include <optional>
+#include <string>
+#include <unordered_set>
 #include <vector>
+#include "main_utils.hpp"
+
 #include "glfw_controller.hpp"
 
 namespace vki {
-enum class QueueFamilyType { GRAPHIC, PRESENT };
+enum class QueueOperationType {
+    GRAPHIC = VK_QUEUE_GRAPHICS_BIT,
+    COMPUTE = VK_QUEUE_COMPUTE_BIT,
+    TRANSFER = VK_QUEUE_TRANSFER_BIT,
+    SPARSE_BINDING = VK_QUEUE_SPARSE_BINDING_BIT,
+    PROTECTED = VK_QUEUE_PROTECTED_BIT,
+    VIDEO_DECODE = VK_QUEUE_VIDEO_DECODE_BIT_KHR,
+    OPTICAL_FLOW = VK_QUEUE_OPTICAL_FLOW_BIT_NV,
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    VIDEO_ENCODE = VK_QUEUE_VIDEO_ENCODE_BIT_KHR,
+#endif
+};
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -21,27 +35,48 @@ struct SwapChainSupportDetails {
     uint32_t getImageCount() const;
 };
 
+std::string operationsToString(
+    std::unordered_set<QueueOperationType> operations);
 
-class PhysicalDevice {
+
+struct QueueFamily {
+    unsigned int index;
+    unsigned int queueCount;
+    uint32_t timestamp_valid_bits;
+    VkExtent3D minImageTransferGranularity;
+    bool presentSupport;
+    std::unordered_set<QueueOperationType> supportedOperations;
+
+    PRINTABLE_DEFINITIONS(QueueFamily)
+};
+
+class PhysicalDevice{
     VkPhysicalDevice device;
-    void saveQueueFamilyIndexes(const VkSurfaceKHR &surface);
+    void saveQueueFamilies(const VkSurfaceKHR &surface);
     std::vector<VkQueueFamilyProperties> getQueueFamiliesProperties() const;
-    std::map<QueueFamilyType, unsigned int> queueFamilyTypeToIndex;
+    std::vector<QueueFamily> queueFamilies;
+    std::optional<unsigned int> presentQueueFamilyIndex;
 
 public:
+    std::optional<unsigned int> getPresentQueueFamilyIndex() const;
+    std::vector<QueueFamily> getQueueFamilies() const;
+    const VkPhysicalDeviceProperties properties;
     explicit PhysicalDevice(const VkPhysicalDevice &dev,
                             const VkSurfaceKHR &surface);
     VkPhysicalDeviceProperties getProperties() const;
     VkPhysicalDevice getVkDevice() const;
-    bool isSuitable() const;
-    unsigned int getFamilyTypeIndex(QueueFamilyType type) const;
 
     VkPhysicalDeviceMemoryProperties getMemoryProperties() const;
 
-    VkSurfaceCapabilitiesKHR getSurfaceCapabilities(const VkSurfaceKHR &surface) const;
-    std::vector<VkSurfaceFormatKHR> getSurfaceFormats(const VkSurfaceKHR& surface) const;
-    std::vector<VkPresentModeKHR> getSurfacePresentModes(const VkSurfaceKHR& surface) const;
-    SwapChainSupportDetails getSwapchainDetails(const VkSurfaceKHR &surface) const;
+    VkSurfaceCapabilitiesKHR getSurfaceCapabilities(
+        const VkSurfaceKHR &surface) const;
+    std::vector<VkSurfaceFormatKHR> getSurfaceFormats(
+        const VkSurfaceKHR &surface) const;
+    std::vector<VkPresentModeKHR> getSurfacePresentModes(
+        const VkSurfaceKHR &surface) const;
+    SwapChainSupportDetails getSwapchainDetails(
+        const VkSurfaceKHR &surface) const;
+
+    PRINTABLE_DEFINITIONS(PhysicalDevice)
 };
 };  // namespace vki
-#endif

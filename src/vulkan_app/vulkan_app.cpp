@@ -9,15 +9,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <ios>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "easylogging++.h"
 #include "glfw_controller.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -77,10 +80,28 @@ const std::vector<Vertex> vertices = {
 };
 
 const vki::PhysicalDevice VulkanApplication::pickPhysicalDevice() {
+    logger->info("Getting all available physical devices...");
     const auto &devices = instance.getPhysicalDevices();
-    const auto &it = std::ranges::find_if(
-        devices,
-        [](const vki::PhysicalDevice &device) { return device.isSuitable(); });
+    for (const auto &d : devices) {
+        const auto &properties = d.getProperties();
+        logger->info(d);
+        logger->info("Device queues:");
+        logger->info(d.getQueueFamilies());
+    };
+    const auto &it =
+        std::ranges::find_if(devices, [](const vki::PhysicalDevice &device) {
+            if (device.getPresentQueueFamilyIndex() == std::nullopt)
+                return false;
+            const auto &queueFamilies = device.getQueueFamilies();
+            const auto &queueFamilyit = std::ranges::find_if(
+                queueFamilies, [](const vki::QueueFamily &queueFamily) {
+                    return std::ranges::find(
+                               queueFamily.supportedOperations,
+                               vki::QueueOperationType::GRAPHIC) !=
+                           queueFamily.supportedOperations.end();
+                });
+            return queueFamilyit != queueFamilies.end();
+        });
     if (it == devices.end()) {
         throw std::runtime_error("No suitable physical devices present");
     };
@@ -101,19 +122,28 @@ const vki::Swapchain VulkanApplication::createSwapChain(
 VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
                                      const GLFWController &controller,
                                      const GLFWControllerWindow &window)
-    : instance{ params, window } {
+    : instance{ params, window },
+      logger{ el::Loggers::getLogger("VulkanApplication") } {
     const vki::PhysicalDevice &physicalDevice = pickPhysicalDevice();
+    logger->info(std::format("Picked physical device: {}", (std::string)physicalDevice));
     const vki::LogicalDevice logicalDevice = vki::LogicalDevice(physicalDevice);
+    logger->info("Created logical device");
     const auto &graphicsQueue =
         vki::GraphicsQueue(logicalDevice, logicalDevice.graphicsQueueIndex);
+    logger->info("Created graphics queue");
     const auto &presentQueue =
         vki::PresentQueue(logicalDevice, logicalDevice.presentQueueIndex);
+    logger->info("Created present queue");
     const vki::Swapchain &swapchain =
         createSwapChain(physicalDevice, logicalDevice, window);
+    logger->info("Created swapchain");
     const auto renderPass = vki::RenderPass(swapChainFormat, logicalDevice);
+    logger->info("Created render pass");
     const auto pipelineLayout = vki::PipelineLayout(logicalDevice);
+    logger->info("Created pipeline layout");
     const auto pipeline =
         createGraphicsPipeline(logicalDevice, renderPass, pipelineLayout);
+    logger->info("Created pipeline");
     const auto framebuffers =
         swapchain.swapChainImageViews |
         std::views::transform([&swapchain, &renderPass, &logicalDevice,
@@ -123,13 +153,16 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
                                                       logicalDevice, imageView);
         }) |
         std::ranges::to<std::vector>();
-    const auto &commandPool = vki::CommandPool(logicalDevice, physicalDevice);
+    logger->info("Created framebuffers");
+    const auto &commandPool = vki::CommandPool(logicalDevice, graphicsQueue);
+    logger->info("Created command pool");
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sizeof(vertices[0]) * vertices.size();
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     auto vertexBuffer = vki::Buffer(logicalDevice, bufferInfo);
+    logger->info("Created vertex buffer");
     const auto &memoryRequirements = vertexBuffer.getMemoryRequirements();
     const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &memoryTypeIndex = utils::findMemoryType(
@@ -142,16 +175,20 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
     allocInfo.memoryTypeIndex = memoryTypeIndex;
     const auto &vertexBufferMemory =
         std::make_shared<vki::Memory>(logicalDevice, allocInfo);
+    logger->info("Created vertex buffer memory");
     vertexBuffer.bindMemory(vertexBufferMemory);
     void *data;
     vertexBufferMemory->mapMemory(bufferInfo.size, &data);
     memcpy(data, vertices.data(), (size_t)bufferInfo.size);
     vertexBufferMemory->unmapMemory();
+    logger->info("Filled vertex buffer memory");
     const auto &commandBuffer = commandPool.createCommandBuffer();
+    logger->info("Created command buffer");
     const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);
     const auto &renderFinishedSemaphore = vki::Semaphore(logicalDevice);
     const auto &inFlightFence = vki::Fence(logicalDevice);
-
+    logger->info("Created semaphores and fences");
+    logger->info("Entering main loop...");
     while (!window.shouldClose()) {
         controller.pollEvents();
         drawFrame(logicalDevice, swapchain, renderPass, pipeline, framebuffers,
@@ -160,6 +197,7 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
                   presentQueue);
     };
 
+    logger->info("Waiting for queued operations to complete...");
     logicalDevice.waitIdle();
 };
 
@@ -224,11 +262,10 @@ void VulkanApplication::drawFrame(
           .waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT } });
     graphicsQueue.submit({ submitInfo }, &inFlightFence);
 
-    vki::PresentInfo presentInfo({
-        .waitSemaphores = { &renderFinishedSemaphore },
-        .swapchains = { &swapchain },
-        .imageIndices = { imageIndex }
-    });
+    vki::PresentInfo presentInfo(
+        { .waitSemaphores = { &renderFinishedSemaphore },
+          .swapchains = { &swapchain },
+          .imageIndices = { imageIndex } });
     presentQueue.present(presentInfo);
 };
 

@@ -16,7 +16,8 @@ protected:
     VkQueue queue;
 
 public:
-    explicit Queue(const vki::LogicalDevice &device, const uint32_t queueIndex);
+    const uint32_t queueFamilyIndex;
+    explicit Queue(const vki::LogicalDevice &device, const uint32_t queueFamilyIndex);
     const VkQueue getVkQueue() const;
 };
 

@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "vulkan_app/vki/base.hpp"
@@ -9,10 +10,15 @@
 
 vki::LogicalDevice::LogicalDevice(const vki::PhysicalDevice &physicalDevice) {
     float queuePriority = 1.0f;
-    graphicsQueueIndex =
-        physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::GRAPHIC);
-    presentQueueIndex =
-        physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::PRESENT);
+    const auto& queueFamilies = physicalDevice.getQueueFamilies();
+    const auto& it = std::ranges::find_if(
+        queueFamilies,
+        [](const vki::QueueFamily &queueFamily) {
+            return queueFamily.supportedOperations.contains(
+                vki::QueueOperationType::GRAPHIC);
+        });
+    graphicsQueueIndex = it->index;
+    presentQueueIndex = physicalDevice.getPresentQueueFamilyIndex().value();
 
     VkDeviceQueueCreateInfo graphicsQueueCreateInfo{};
     graphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -65,7 +71,4 @@ const VkDevice vki::LogicalDevice::getVkDevice() const noexcept {
     return device;
 };
 
-
-void vki::LogicalDevice::waitIdle() const {
-    vkDeviceWaitIdle(device);
-};
+void vki::LogicalDevice::waitIdle() const { vkDeviceWaitIdle(device); };

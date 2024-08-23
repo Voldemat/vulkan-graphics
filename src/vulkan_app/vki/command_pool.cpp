@@ -5,17 +5,16 @@
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
-#include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/queue.hpp"
 
 vki::CommandPool::CommandPool(const vki::LogicalDevice &logicalDevice,
-                              const vki::PhysicalDevice &physicalDevice)
+                              const vki::GraphicsQueue &graphicsQueue)
     : device{ logicalDevice.getVkDevice() } {
     VkCommandPoolCreateInfo commandPoolCreateInfo{};
     commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     commandPoolCreateInfo.flags =
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolCreateInfo.queueFamilyIndex =
-        physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::GRAPHIC);
+    commandPoolCreateInfo.queueFamilyIndex = graphicsQueue.queueFamilyIndex;
     VkResult result =
         vkCreateCommandPool(logicalDevice.getVkDevice(), &commandPoolCreateInfo,
                             nullptr, &vkCommandPool);

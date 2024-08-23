@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -38,10 +39,16 @@ vki::Swapchain::Swapchain(const vki::LogicalDevice &logicalDevice,
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
     unsigned int graphicsQueueIndex, presentQueueIndex;
-    graphicsQueueIndex =
-        physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::GRAPHIC);
+    const auto& queueFamilies = physicalDevice.getQueueFamilies();
+    const auto& it = std::ranges::find_if(
+        queueFamilies,
+        [](const vki::QueueFamily &queueFamily) {
+            return queueFamily.supportedOperations.contains(
+                vki::QueueOperationType::GRAPHIC);
+        });
+    graphicsQueueIndex = it->index;
     presentQueueIndex =
-        physicalDevice.getFamilyTypeIndex(vki::QueueFamilyType::PRESENT);
+        physicalDevice.getPresentQueueFamilyIndex().value();
     if (graphicsQueueIndex != presentQueueIndex) {
         std::vector<uint32_t> queueIndices = { graphicsQueueIndex,
                                                presentQueueIndex };
