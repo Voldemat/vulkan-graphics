@@ -7,12 +7,11 @@
 #include <vector>
 
 #include "glfw_controller.hpp"
-#include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 
 namespace vki {
-
+class LogicalDevice;
 class Swapchain {
     const VkDevice device;
     VkSwapchainKHR vkSwapchain;
@@ -24,6 +23,8 @@ public:
     std::vector<VkImageView> swapChainImageViews;
     explicit Swapchain(const vki::LogicalDevice &logicalDevice,
                        const vki::PhysicalDevice &physicalDevice,
+                       const vki::QueueFamily &graphicsQueueFamily,
+                       const vki::QueueFamily &presentQueueFamily,
                        const VkSurfaceKHR &surface,
                        const GLFWControllerWindow &window);
     const VkSwapchainKHR getVkSwapchain() const;

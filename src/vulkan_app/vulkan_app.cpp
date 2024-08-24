@@ -86,21 +86,27 @@ const vki::PhysicalDevice VulkanApplication::pickPhysicalDevice() {
         const auto &properties = d.getProperties();
         logger->info(d);
         logger->info("Device queues:");
-        logger->info(d.getQueueFamilies());
+        logger->info(d.getQueueFamilies() |
+                     std::views::transform([](const auto &f) { return *f; }) |
+                     std::ranges::to<std::vector>());
     };
     const auto &it =
         std::ranges::find_if(devices, [](const vki::PhysicalDevice &device) {
-            if (device.getPresentQueueFamilyIndex() == std::nullopt)
-                return false;
             const auto &queueFamilies = device.getQueueFamilies();
-            const auto &queueFamilyit = std::ranges::find_if(
-                queueFamilies, [](const vki::QueueFamily &queueFamily) {
-                    return std::ranges::find(
-                               queueFamily.supportedOperations,
-                               vki::QueueOperationType::GRAPHIC) !=
-                           queueFamily.supportedOperations.end();
+            const auto &graphicsQueueFamilyit = std::ranges::find_if(
+                queueFamilies, [](const auto &queueFamily) {
+                    return queueFamily->supportedOperations.contains(
+                        vki::QueueOperationType::GRAPHIC);
                 });
-            return queueFamilyit != queueFamilies.end();
+            if (graphicsQueueFamilyit == queueFamilies.end()) {
+                return false;
+            };
+            const auto &presentQueueFamilyit = std::ranges::find_if(
+                queueFamilies, [](const auto &queueFamily) {
+                    return queueFamily->supportedOperations.contains(
+                        vki::QueueOperationType::GRAPHIC);
+                });
+            return presentQueueFamilyit != queueFamilies.end();
         });
     if (it == devices.end()) {
         throw std::runtime_error("No suitable physical devices present");
@@ -111,12 +117,31 @@ const vki::PhysicalDevice VulkanApplication::pickPhysicalDevice() {
 const vki::Swapchain VulkanApplication::createSwapChain(
     const vki::PhysicalDevice &physicalDevice,
     const vki::LogicalDevice &logicalDevice,
+    const vki::QueueFamily &graphicsQueueFamily,
+    const vki::QueueFamily &presentQueueFamily,
     const GLFWControllerWindow &window) {
     auto details = physicalDevice.getSwapchainDetails(instance.getSurface());
     swapChainFormat = details.chooseFormat().format;
     swapChainExtent = details.chooseSwapExtent(window);
-    return vki::Swapchain(logicalDevice, physicalDevice, instance.getSurface(),
-                          window);
+    return vki::Swapchain(logicalDevice, physicalDevice, graphicsQueueFamily,
+                          presentQueueFamily, instance.getSurface(), window);
+};
+
+vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC>
+pickGraphicsQueueFamily(
+    const std::vector<std::shared_ptr<vki::QueueFamily>> &families) {
+    return { .family = *std::ranges::find_if(families, [](const auto &family) {
+                 return family->supportedOperations.contains(
+                     vki::QueueOperationType::GRAPHIC);
+             }) };
+};
+
+vki::QueueFamilyWithOp<vki::QueueOperationType::PRESENT> pickPresentQueueFamily(
+    const std::vector<std::shared_ptr<vki::QueueFamily>> &families) {
+    return { .family = *std::ranges::find_if(families, [](const auto &family) {
+                 return family->supportedOperations.contains(
+                     vki::QueueOperationType::PRESENT);
+             }) };
 };
 
 VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
@@ -125,17 +150,26 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
     : instance{ params, window },
       logger{ el::Loggers::getLogger("VulkanApplication") } {
     const vki::PhysicalDevice &physicalDevice = pickPhysicalDevice();
-    logger->info(std::format("Picked physical device: {}", (std::string)physicalDevice));
-    const vki::LogicalDevice logicalDevice = vki::LogicalDevice(physicalDevice);
+    const auto &queueFamilies = physicalDevice.getQueueFamilies();
+    logger->info(
+        std::format("Picked physical device: {}", (std::string)physicalDevice));
+    const auto &graphicsQueueFamily = pickGraphicsQueueFamily(queueFamilies);
+    logger->info(std::format("Picked graphics queue family: {}",
+                             (std::string)*graphicsQueueFamily.family));
+    const auto &presentQueueFamily = pickPresentQueueFamily(queueFamilies);
+    logger->info(std::format("Picked present queue family: {}",
+                             (std::string)*presentQueueFamily.family));
+    const vki::LogicalDevice logicalDevice =
+        vki::LogicalDevice(physicalDevice, *graphicsQueueFamily.family,
+                           *presentQueueFamily.family);
     logger->info("Created logical device");
-    const auto &graphicsQueue =
-        vki::GraphicsQueue(logicalDevice, logicalDevice.graphicsQueueIndex);
+    const auto &graphicsQueue = logicalDevice.getQueue(graphicsQueueFamily);
     logger->info("Created graphics queue");
-    const auto &presentQueue =
-        vki::PresentQueue(logicalDevice, logicalDevice.presentQueueIndex);
+    const auto &presentQueue = logicalDevice.getQueue(presentQueueFamily);
     logger->info("Created present queue");
-    const vki::Swapchain &swapchain =
-        createSwapChain(physicalDevice, logicalDevice, window);
+    const vki::Swapchain &swapchain = createSwapChain(
+        physicalDevice, logicalDevice, *graphicsQueueFamily.family,
+        *presentQueueFamily.family, window);
     logger->info("Created swapchain");
     const auto renderPass = vki::RenderPass(swapChainFormat, logicalDevice);
     logger->info("Created render pass");
@@ -245,8 +279,9 @@ void VulkanApplication::drawFrame(
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
     const vki::Semaphore &renderFinishedSemaphore,
-    const vki::Buffer &vertexBuffer, const vki::GraphicsQueue &graphicsQueue,
-    const vki::PresentQueue &presentQueue) {
+    const vki::Buffer &vertexBuffer,
+    const vki::Queue<vki::QueueOperationType::GRAPHIC> &graphicsQueue,
+    const vki::Queue<vki::QueueOperationType::PRESENT> &presentQueue) {
     inFlightFence.wait();
 
     uint32_t imageIndex =

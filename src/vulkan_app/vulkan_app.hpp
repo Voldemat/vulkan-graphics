@@ -26,13 +26,15 @@
 
 class VulkanApplication {
     vki::VulkanInstance instance;
-    el::Logger* logger;
+    el::Logger *logger;
     VkFormat swapChainFormat;
     VkExtent2D swapChainExtent;
     const vki::PhysicalDevice pickPhysicalDevice();
     const vki::Swapchain createSwapChain(
         const vki::PhysicalDevice &physicalDevice,
         const vki::LogicalDevice &logicalDevice,
+        const vki::QueueFamily &graphicsQueueFamily,
+        const vki::QueueFamily &presentQueueFamily,
         const GLFWControllerWindow &window);
     vki::GraphicsPipeline createGraphicsPipeline(
         const vki::LogicalDevice &logicalDevice,
@@ -56,9 +58,8 @@ public:
         const vki::Semaphore &imageAvailableSemaphore,
         const vki::Semaphore &renderFinishedSemaphore,
         const vki::Buffer &vertexBuffer,
-        const vki::GraphicsQueue& graphicsQueue,
-        const vki::PresentQueue& presentQueue
-    );
+        const vki::Queue<vki::QueueOperationType::GRAPHIC> &graphicsQueue,
+        const vki::Queue<vki::QueueOperationType::PRESENT> &presentQueue);
     VulkanApplication(const VulkanApplication &other) = delete;
     VulkanApplication(vki::VulkanInstanceParams params,
                       const GLFWController &controller,

@@ -3,8 +3,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <ranges>
-#include <utility>
 #include <vector>
 
 #include "vulkan_app/vki/command_buffer.hpp"

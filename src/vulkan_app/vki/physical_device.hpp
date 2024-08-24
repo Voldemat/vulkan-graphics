@@ -3,16 +3,17 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <optional>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include "main_utils.hpp"
 
 #include "glfw_controller.hpp"
+#include "main_utils.hpp"
 
 namespace vki {
 enum class QueueOperationType {
+    PRESENT,
     GRAPHIC = VK_QUEUE_GRAPHICS_BIT,
     COMPUTE = VK_QUEUE_COMPUTE_BIT,
     TRANSFER = VK_QUEUE_TRANSFER_BIT,
@@ -38,28 +39,29 @@ struct SwapChainSupportDetails {
 std::string operationsToString(
     std::unordered_set<QueueOperationType> operations);
 
-
 struct QueueFamily {
     unsigned int index;
     unsigned int queueCount;
     uint32_t timestamp_valid_bits;
     VkExtent3D minImageTransferGranularity;
-    bool presentSupport;
-    std::unordered_set<QueueOperationType> supportedOperations;
+    std::unordered_set<vki::QueueOperationType> supportedOperations;
 
     PRINTABLE_DEFINITIONS(QueueFamily)
 };
 
-class PhysicalDevice{
+template <enum QueueOperationType... T>
+struct QueueFamilyWithOp {
+    std::shared_ptr<QueueFamily> family;
+};
+
+class PhysicalDevice {
     VkPhysicalDevice device;
     void saveQueueFamilies(const VkSurfaceKHR &surface);
     std::vector<VkQueueFamilyProperties> getQueueFamiliesProperties() const;
-    std::vector<QueueFamily> queueFamilies;
-    std::optional<unsigned int> presentQueueFamilyIndex;
+    std::vector<std::shared_ptr<QueueFamily>> queueFamilies;
 
 public:
-    std::optional<unsigned int> getPresentQueueFamilyIndex() const;
-    std::vector<QueueFamily> getQueueFamilies() const;
+    std::vector<std::shared_ptr<QueueFamily>> getQueueFamilies() const;
     const VkPhysicalDeviceProperties properties;
     explicit PhysicalDevice(const VkPhysicalDevice &dev,
                             const VkSurfaceKHR &surface);

@@ -2,23 +2,18 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <algorithm>
 #include <vector>
 
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/queue.hpp"
 
-vki::LogicalDevice::LogicalDevice(const vki::PhysicalDevice &physicalDevice) {
+vki::LogicalDevice::LogicalDevice(const vki::PhysicalDevice &physicalDevice,
+                                  const vki::QueueFamily &graphicsQueueFamily,
+                                  const vki::QueueFamily &presentQueueFamily) {
     float queuePriority = 1.0f;
-    const auto& queueFamilies = physicalDevice.getQueueFamilies();
-    const auto& it = std::ranges::find_if(
-        queueFamilies,
-        [](const vki::QueueFamily &queueFamily) {
-            return queueFamily.supportedOperations.contains(
-                vki::QueueOperationType::GRAPHIC);
-        });
-    graphicsQueueIndex = it->index;
-    presentQueueIndex = physicalDevice.getPresentQueueFamilyIndex().value();
+    graphicsQueueIndex = graphicsQueueFamily.index;
+    presentQueueIndex = presentQueueFamily.index;
 
     VkDeviceQueueCreateInfo graphicsQueueCreateInfo{};
     graphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -72,3 +67,23 @@ const VkDevice vki::LogicalDevice::getVkDevice() const noexcept {
 };
 
 void vki::LogicalDevice::waitIdle() const { vkDeviceWaitIdle(device); };
+
+vki::Queue<vki::QueueOperationType::PRESENT> vki::LogicalDevice::getQueue(
+    const vki::QueueFamilyWithOp<vki::QueueOperationType::PRESENT>
+        &presentQueueFamily) const {
+    VkQueue queue;
+    vkGetDeviceQueue(getVkDevice(), presentQueueFamily.family->index, 0,
+                     &queue);
+    return vki::Queue<vki::QueueOperationType::PRESENT>(
+        queue, presentQueueFamily.family->index);
+};
+
+vki::Queue<vki::QueueOperationType::GRAPHIC> vki::LogicalDevice::getQueue(
+    const vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC>
+        &graphicsQueueFamily) const {
+    VkQueue queue;
+    vkGetDeviceQueue(getVkDevice(), graphicsQueueFamily.family->index, 0,
+                     &queue);
+    return vki::Queue<vki::QueueOperationType::GRAPHIC>(
+        queue, graphicsQueueFamily.family->index);
+};

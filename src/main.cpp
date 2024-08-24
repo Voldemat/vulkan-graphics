@@ -1,4 +1,5 @@
 #include <vulkan/vulkan_core.h>
+
 #include <string>
 
 #include "./glfw_controller.hpp"
@@ -11,14 +12,14 @@
 INITIALIZE_EASYLOGGINGPP
 
 int main() {
-    auto& mainLogger = *el::Loggers::getLogger("main");
+    auto &mainLogger = *el::Loggers::getLogger("main");
     mainLogger.info("Creating GLFWController...");
     GLFWController controller;
     mainLogger.info("Created GLFWController");
     mainLogger.info("Obtaining GLFWControllerWindow...");
     GLFWControllerWindow window = controller.createWindow();
     mainLogger.info("Obtained GLFWControllerWindow...");
-    const auto& requiredExtensions = controller.getRequiredExtensions();
+    const auto &requiredExtensions = controller.getRequiredExtensions();
     mainLogger.info("GLFW Required extensions: ");
     mainLogger.info(requiredExtensions);
     vki::VulkanInstanceParams params = {

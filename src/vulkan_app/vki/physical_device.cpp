@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <format>
 #include <limits>
-#include <optional>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -61,45 +61,29 @@ vki::QueueFamily::operator std::string() const {
     return std::format(
         "QueueFamily(index: {}, queueCount: {}, timestamp_valid_bits: {}, "
         "minImageTransferGranularity: VkExtent3D(height: {}, width: {}, "
-        "height: {}), presentSupport: {}, supportedOperations: {})",
+        "height: {}), supportedOperations: {})",
         index, queueCount, timestamp_valid_bits,
         minImageTransferGranularity.height, minImageTransferGranularity.width,
-        minImageTransferGranularity.height, presentSupport,
+        minImageTransferGranularity.height,
         operationsToString(supportedOperations));
 };
 
 void vki::PhysicalDevice::saveQueueFamilies(const VkSurfaceKHR &surface) {
     unsigned int i = 0;
     for (const auto &queueFamily : getQueueFamiliesProperties()) {
-        const auto &supportedOperations =
-            operationsFromFlags(queueFamily.queueFlags);
+        auto supportedOperations = operationsFromFlags(queueFamily.queueFlags);
         VkBool32 presentSupport = false;
         VkResult result = vkGetPhysicalDeviceSurfaceSupportKHR(
             device, i, surface, &presentSupport);
         if (result != VK_SUCCESS) {
             throw VulkanError(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
         };
-        const vki::QueueFamily check = {
-            .index = i,
-            .queueCount = queueFamily.queueCount,
-            .timestamp_valid_bits = queueFamily.timestampValidBits,
-            .minImageTransferGranularity =
-                queueFamily.minImageTransferGranularity,
-            .presentSupport = presentSupport == 1,
-            .supportedOperations = supportedOperations,
-        };
-        queueFamilies.push_back({
-            .index = i,
-            .queueCount = queueFamily.queueCount,
-            .timestamp_valid_bits = queueFamily.timestampValidBits,
-            .minImageTransferGranularity =
-                queueFamily.minImageTransferGranularity,
-            .presentSupport = presentSupport == 1,
-            .supportedOperations = supportedOperations,
-        });
         if (presentSupport) {
-            presentQueueFamilyIndex = i;
+            supportedOperations.insert(vki::QueueOperationType::PRESENT);
         };
+        queueFamilies.push_back(std::make_shared<vki::QueueFamily>(
+            i, queueFamily.queueCount, queueFamily.timestampValidBits,
+            queueFamily.minImageTransferGranularity, supportedOperations));
         i++;
     }
 };
@@ -234,11 +218,8 @@ VkPhysicalDeviceMemoryProperties vki::PhysicalDevice::getMemoryProperties()
     return memProperties;
 };
 
-std::optional<unsigned int> vki::PhysicalDevice::getPresentQueueFamilyIndex()
-    const {
-    return presentQueueFamilyIndex;
-};
-std::vector<vki::QueueFamily> vki::PhysicalDevice::getQueueFamilies() const {
+std::vector<std::shared_ptr<vki::QueueFamily>>
+vki::PhysicalDevice::getQueueFamilies() const {
     return queueFamilies;
 };
 

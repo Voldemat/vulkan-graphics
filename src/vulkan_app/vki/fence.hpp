@@ -1,8 +1,9 @@
 #ifndef VKI_FENCE
 #define VKI_FENCE
 #include <vulkan/vulkan_core.h>
-#include "vulkan_app/vki/logical_device.hpp"
+
 namespace vki {
+class LogicalDevice;
 class Fence {
     VkFence vkFence;
     VkDevice device;
