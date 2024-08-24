@@ -30,13 +30,13 @@ struct SubmitInfo {
 struct PresentInfoInputData {
     std::vector<const vki::Semaphore *> waitSemaphores;
     std::vector<const vki::Swapchain *> swapchains;
-    std::vector<const uint32_t> imageIndices;
+    std::vector<uint32_t> imageIndices;
 };
 
 struct PresentInfo {
     std::vector<VkSemaphore> waitSemaphores;
     std::vector<VkSwapchainKHR> swapchains;
-    std::vector<const uint32_t> imageIndices;
+    std::vector<uint32_t> imageIndices;
 
     explicit PresentInfo(const PresentInfoInputData &&data);
     const VkPresentInfoKHR getVkPresentInfo() const;
