@@ -11,7 +11,7 @@
 #include "vulkan_app/vki/structs.hpp"
 
 void vki::GraphicsQueueMixin::submit(
-    const std::vector<const vki::SubmitInfo> &infoArray,
+    const std::vector<vki::SubmitInfo> &infoArray,
     const std::optional<const vki::Fence *> &fence) const {
     const auto &finalInfo = infoArray |
                             std::views::transform([](const auto &info) {

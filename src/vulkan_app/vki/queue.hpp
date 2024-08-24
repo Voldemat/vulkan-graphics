@@ -21,7 +21,7 @@ public:
 
 class GraphicsQueueMixin : public BaseQueue {
 public:
-    void submit(const std::vector<const SubmitInfo> &submitInfos,
+    void submit(const std::vector<SubmitInfo> &submitInfos,
                 const std::optional<const Fence *> &fence) const;
 };
 
