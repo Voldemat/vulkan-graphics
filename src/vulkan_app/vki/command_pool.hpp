@@ -14,10 +14,12 @@ class CommandPool {
     void init(const unsigned int &queueFamilyIndex);
 
 public:
-    template <enum vki::QueueOperationType... T>
+    template <unsigned int AvailableQueueCount,
+              enum vki::QueueOperationType... T>
     explicit CommandPool(
         const vki::LogicalDevice &logicalDevice,
-        const vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC, T...>
+        const vki::QueueFamilyWithOp<AvailableQueueCount,
+                                     vki::QueueOperationType::GRAPHIC, T...>
             &graphicQueueFamily)
         : device{ logicalDevice.getVkDevice() } {
         init(graphicQueueFamily.family->index);

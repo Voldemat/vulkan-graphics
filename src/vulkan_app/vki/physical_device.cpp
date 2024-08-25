@@ -5,16 +5,18 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <limits>
 #include <memory>
+#include <set>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "./base.hpp"
 #include "glfw_controller.hpp"
 #include "magic_enum.hpp"
+#include "vulkan_app/vki/surface.hpp"
 
 vki::PhysicalDevice::operator std::string() const {
     return std::format(
@@ -26,14 +28,14 @@ vki::PhysicalDevice::operator std::string() const {
 };
 
 vki::PhysicalDevice::PhysicalDevice(const VkPhysicalDevice &dev,
-                                    const VkSurfaceKHR &surface)
+                                    const vki::Surface &surface)
     : device{ dev }, properties{ getProperties() } {
     saveQueueFamilies(surface);
 };
 
-std::unordered_set<vki::QueueOperationType> operationsFromFlags(
+std::set<vki::QueueOperationType> operationsFromFlags(
     const VkQueueFlags &flags) {
-    std::unordered_set<vki::QueueOperationType> operations;
+    std::set<vki::QueueOperationType> operations;
     if (flags & VK_QUEUE_GRAPHICS_BIT) {
         operations.insert(vki::QueueOperationType::GRAPHIC);
     } else if (flags & VK_QUEUE_COMPUTE_BIT) {
@@ -68,13 +70,44 @@ vki::QueueFamily::operator std::string() const {
         operationsToString(supportedOperations));
 };
 
-void vki::PhysicalDevice::saveQueueFamilies(const VkSurfaceKHR &surface) {
+bool vki::QueueFamily::doesSupportsOperations(
+    const std::set<vki::QueueOperationType> &ops) const {
+    return std::includes(supportedOperations.begin(), supportedOperations.end(),
+                         ops.begin(), ops.end());
+};
+
+bool vki::PhysicalDevice::hasQueueFamilies(
+    const std::vector<std::function<bool(const QueueFamily &)>> &funcs) const {
+    return std::ranges::all_of(
+        funcs.begin(), funcs.end(), [this](const auto &func) -> bool {
+            return std::ranges::any_of(
+                queueFamilies.begin(), queueFamilies.end(),
+                [&func](const auto &queueFamily) -> bool {
+                    return func(*queueFamily);
+                });
+        });
+};
+
+bool vki::PhysicalDevice::hasExtensions(
+    const std::vector<std::function<bool(const VkExtensionProperties &)>>
+        &funcs) const {
+    const auto &extensions = getExtensions();
+    return std::ranges::all_of(
+        funcs.begin(), funcs.end(), [&extensions](const auto &func) -> bool {
+            return std::ranges::any_of(extensions.begin(), extensions.end(),
+                                       [&func](const auto &extension) -> bool {
+                                           return func(extension);
+                                       });
+        });
+};
+
+void vki::PhysicalDevice::saveQueueFamilies(const vki::Surface &surface) {
     unsigned int i = 0;
     for (const auto &queueFamily : getQueueFamiliesProperties()) {
         auto supportedOperations = operationsFromFlags(queueFamily.queueFlags);
         VkBool32 presentSupport = false;
         VkResult result = vkGetPhysicalDeviceSurfaceSupportKHR(
-            device, i, surface, &presentSupport);
+            device, i, surface.getVkSurfaceKHR(), &presentSupport);
         if (result != VK_SUCCESS) {
             throw VulkanError(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
         };
@@ -117,44 +150,44 @@ vki::PhysicalDevice::getQueueFamiliesProperties() const {
 // };
 
 VkSurfaceCapabilitiesKHR vki::PhysicalDevice::getSurfaceCapabilities(
-    const VkSurfaceKHR &surface) const {
+    const vki::Surface &surface) const {
     VkSurfaceCapabilitiesKHR details;
-    VkResult result =
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details);
+    VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+        device, surface.getVkSurfaceKHR(), &details);
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
     return details;
 };
 
 std::vector<VkSurfaceFormatKHR> vki::PhysicalDevice::getSurfaceFormats(
-    const VkSurfaceKHR &surface) const {
+    const vki::Surface &surface) const {
     std::vector<VkSurfaceFormatKHR> formats;
     uint32_t formatCount;
     VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        device, surface, &formatCount, nullptr);
+        device, surface.getVkSurfaceKHR(), &formatCount, nullptr);
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
     formats.resize(formatCount);
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
-                                                  formats.data());
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+        device, surface.getVkSurfaceKHR(), &formatCount, formats.data());
     assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
     return formats;
 };
 
 std::vector<VkPresentModeKHR> vki::PhysicalDevice::getSurfacePresentModes(
-    const VkSurfaceKHR &surface) const {
+    const vki::Surface &surface) const {
     std::vector<VkPresentModeKHR> presentModes;
     uint32_t modesCount;
     VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device, surface, &modesCount, nullptr);
+        device, surface.getVkSurfaceKHR(), &modesCount, nullptr);
     assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     presentModes.resize(modesCount);
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device, surface, &modesCount, presentModes.data());
+        device, surface.getVkSurfaceKHR(), &modesCount, presentModes.data());
     assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     return presentModes;
 };
 
 vki::SwapChainSupportDetails vki::PhysicalDevice::getSwapchainDetails(
-    const VkSurfaceKHR &surface) const {
+    const vki::Surface &surface) const {
     vki::SwapChainSupportDetails details;
     details.capabilities = getSurfaceCapabilities(surface);
     details.formats = getSurfaceFormats(surface);
@@ -218,13 +251,30 @@ VkPhysicalDeviceMemoryProperties vki::PhysicalDevice::getMemoryProperties()
     return memProperties;
 };
 
+std::vector<VkExtensionProperties> vki::PhysicalDevice::getExtensions() const {
+    uint32_t extensionCount;
+    VkResult result = vkEnumerateDeviceExtensionProperties(
+        device, nullptr, &extensionCount, nullptr);
+    if (result != VK_SUCCESS) {
+        throw vki::VulkanError(result, "vkEnumerateDeviceExtensionProperties");
+    };
+
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    result = vkEnumerateDeviceExtensionProperties(
+        device, nullptr, &extensionCount, extensions.data());
+    if (result != VK_SUCCESS) {
+        throw vki::VulkanError(result, "vkEnumerateDeviceExtensionProperties");
+    };
+    return extensions;
+};
+
 std::vector<std::shared_ptr<vki::QueueFamily>>
 vki::PhysicalDevice::getQueueFamilies() const {
     return queueFamilies;
 };
 
 std::string vki::operationsToString(
-    std::unordered_set<vki::QueueOperationType> operations) {
+    std::set<vki::QueueOperationType> operations) {
     std::string str = "{";
     unsigned int index = 0;
     for (const auto &op : operations) {

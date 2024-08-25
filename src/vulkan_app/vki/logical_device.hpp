@@ -29,19 +29,29 @@ public:
             queueInfoArray);
         init(physicalDevice, queueCreateInfoArray);
     };
-    LogicalDevice(LogicalDevice &&other);
-    template <unsigned int QueueIndex, enum vki::QueueOperationType... T>
+
+    template <unsigned int QueueIndex, unsigned int QueueCount,
+              unsigned int AvailableQueueCount,
+              enum vki::QueueOperationType... T>
     vki::Queue<T...> getQueue(
-        const vki::QueueCreateInfo<QueueIndex + 1, T...> &createInfo) const {
+        const vki::QueueCreateInfo<QueueCount, AvailableQueueCount, T...>
+            &createInfo) const
+
+    {
+        static_assert(QueueIndex < QueueCount,
+                      "QueueIndex must be less than QueueCount");
         unsigned int queueFamilyIndex = createInfo.queueFamily.family->index;
         VkQueue queue;
         vkGetDeviceQueue(device, queueFamilyIndex, QueueIndex, &queue);
         return vki::Queue<T...>(queue, queueFamilyIndex);
     };
+
+    LogicalDevice(LogicalDevice &&other);
     const VkDevice getVkDevice() const noexcept;
     void waitIdle() const;
     ~LogicalDevice();
 };
+
 };  // namespace vki
 
 #endif

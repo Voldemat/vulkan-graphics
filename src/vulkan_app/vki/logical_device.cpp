@@ -6,8 +6,6 @@
 
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
-#include "vulkan_app/vki/queue.hpp"
-#include "vulkan_app/vki/structs.hpp"
 
 void vki::LogicalDevice::init(
     const vki::PhysicalDevice &physicalDevice,

@@ -8,8 +8,7 @@
 
 #include "./base.hpp"
 #include "./physical_device.hpp"
-#include "GLFW/glfw3.h"
-#include "glfw_controller.hpp"
+#include "vulkan_app/vki/surface.hpp"
 
 std::vector<const char *> vki::VulkanInstanceParams::getLayers()
     const noexcept {
@@ -25,8 +24,7 @@ std::vector<const char *> vki::VulkanInstanceParams::getExtensions()
            std::ranges::to<std::vector>();
 };
 
-vki::VulkanInstance::VulkanInstance(VulkanInstanceParams params,
-                                    const GLFWControllerWindow &window) {
+vki::VulkanInstance::VulkanInstance(VulkanInstanceParams params) {
     params.extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
     params.extensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -54,36 +52,26 @@ vki::VulkanInstance::VulkanInstance(VulkanInstanceParams params,
     if (result != VK_SUCCESS) {
         throw VulkanError(result, "vkCreateInstance");
     };
-
-    result = glfwCreateWindowSurface(instance, window.getGLFWWindow(), nullptr,
-                                     &surface);
-    if (result != VK_SUCCESS) {
-        throw VulkanError(result, "glfwCreateWindowSurface");
-    };
 };
 
 const VkInstance vki::VulkanInstance::getInstance() const noexcept {
     return instance;
 };
 
-const VkSurfaceKHR vki::VulkanInstance::getSurface() const noexcept {
-    return surface;
-};
-
 vki::VulkanInstance::~VulkanInstance() {
-    vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
 };
 
-std::vector<vki::PhysicalDevice> vki::VulkanInstance::getPhysicalDevices()
-    const {
+std::vector<vki::PhysicalDevice> vki::VulkanInstance::getPhysicalDevices(
+    const vki::Surface &surface) const {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
     std::vector<VkPhysicalDevice> devicesArray(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devicesArray.data());
     return devicesArray |
            std::views::transform(
-               [this](const VkPhysicalDevice &device) -> vki::PhysicalDevice {
+               [this, &surface](
+                   const VkPhysicalDevice &device) -> vki::PhysicalDevice {
                    return vki::PhysicalDevice(device, surface);
                }) |
            std::ranges::to<std::vector>();

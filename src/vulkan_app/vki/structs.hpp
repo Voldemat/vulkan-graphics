@@ -47,10 +47,19 @@ struct PresentInfo {
 
 enum class QueueFlag { PROTECTED = VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT };
 
-template <unsigned int QueueCount = 1, enum QueueOperationType... T>
+template <unsigned int QueueCount = 1, unsigned int AvailableQueueCount = 1,
+          enum QueueOperationType... T>
 struct QueueCreateInfo {
-    static_assert(QueueCount >= 1, "QueueCount must be gte 1");
-    QueueFamilyWithOp<T...> queueFamily;
+    static_assert(QueueCount <= AvailableQueueCount,
+                  "QueueCount must be lte AvailableQueueCount");
+    explicit QueueCreateInfo(
+        const QueueFamilyWithOp<AvailableQueueCount, T...> &qFamily,
+        const std::array<float, QueueCount> &qPriorities = { 1.0f },
+        const std::unordered_set<QueueFlag> &qFlags = {})
+        : queueFamily{ qFamily },
+          queuePriorities{ qPriorities },
+          flags{ qFlags } {};
+    QueueFamilyWithOp<AvailableQueueCount, T...> queueFamily;
     unsigned int queueCount = QueueCount;
     std::array<float, QueueCount> queuePriorities = { 1.0f };
     std::unordered_set<QueueFlag> flags;

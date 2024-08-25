@@ -1,5 +1,4 @@
-#ifndef VKI_INSTANCE
-#define VKI_INSTANCE
+#pragma once
 
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
@@ -11,7 +10,7 @@
 
 #include "./base.hpp"
 #include "./physical_device.hpp"
-#include "glfw_controller.hpp"
+#include "vulkan_app/vki/surface.hpp"
 
 namespace vki {
 
@@ -29,16 +28,13 @@ struct VulkanInstanceParams {
 
 class VulkanInstance {
     VkInstance instance;
-    VkSurfaceKHR surface;
 
 public:
     VulkanInstance(const VulkanInstance &instance) = delete;
-    VulkanInstance(VulkanInstanceParams params, const GLFWControllerWindow &window);
-    std::vector<vki::PhysicalDevice> getPhysicalDevices() const;
+    VulkanInstance(VulkanInstanceParams params);
+    std::vector<vki::PhysicalDevice> getPhysicalDevices(
+        const vki::Surface &surface) const;
     const VkInstance getInstance() const noexcept;
-    const VkSurfaceKHR getSurface() const noexcept;
     ~VulkanInstance();
 };
 };  // namespace vki
-
-#endif

@@ -8,9 +8,11 @@
 
 #include "GLFW/glfw3.h"
 
-GLFWControllerWindow::GLFWControllerWindow() {
+GLFWControllerWindow::GLFWControllerWindow(const std::string &name,
+                                           const unsigned int &width,
+                                           const unsigned int &height) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
+    window = glfwCreateWindow(width, height, name.c_str(), nullptr, nullptr);
 };
 bool GLFWControllerWindow::shouldClose() const {
     return glfwWindowShouldClose(window);
@@ -28,8 +30,10 @@ GLFWController::GLFWController() {
     };
 };
 
-GLFWControllerWindow GLFWController::createWindow() {
-    return GLFWControllerWindow();
+GLFWControllerWindow GLFWController::createWindow(const std::string &name,
+                                                  const unsigned int &width,
+                                                  const unsigned int &height) {
+    return GLFWControllerWindow(name, width, height);
 };
 
 void GLFWController::pollEvents() const { glfwPollEvents(); };
@@ -47,7 +51,8 @@ std::vector<std::string> GLFWController::getRequiredExtensions() {
 
 GLFWController::~GLFWController() { glfwTerminate(); };
 
-std::pair<unsigned int, unsigned int> GLFWControllerWindow::getFramebufferSize() const {
+std::pair<unsigned int, unsigned int> GLFWControllerWindow::getFramebufferSize()
+    const {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     if (width >= 0) {
@@ -58,4 +63,3 @@ std::pair<unsigned int, unsigned int> GLFWControllerWindow::getFramebufferSize()
     };
     return { width, height };
 };
-
