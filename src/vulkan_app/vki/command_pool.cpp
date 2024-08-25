@@ -4,28 +4,21 @@
 
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
-#include "vulkan_app/vki/logical_device.hpp"
-#include "vulkan_app/vki/physical_device.hpp"
-#include "vulkan_app/vki/queue.hpp"
 
-vki::CommandPool::CommandPool(const vki::LogicalDevice &logicalDevice,
-                              const vki::Queue<vki::QueueOperationType::GRAPHIC> &graphicsQueue)
-    : device{ logicalDevice.getVkDevice() } {
+void vki::CommandPool::init(const unsigned int &queueFamilyIndex) {
     VkCommandPoolCreateInfo commandPoolCreateInfo{};
     commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     commandPoolCreateInfo.flags =
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolCreateInfo.queueFamilyIndex = graphicsQueue.queueFamilyIndex;
-    VkResult result =
-        vkCreateCommandPool(logicalDevice.getVkDevice(), &commandPoolCreateInfo,
-                            nullptr, &vkCommandPool);
+    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
+    VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo,
+                                          nullptr, &vkCommandPool);
     vki::assertSuccess(result, "vkCreateCommandPool");
 };
 
 const VkCommandPool vki::CommandPool::getVkCommandPool() const {
     return vkCommandPool;
 };
-
 
 vki::CommandBuffer vki::CommandPool::createCommandBuffer() const {
     return vki::CommandBuffer(vkCommandPool, device);

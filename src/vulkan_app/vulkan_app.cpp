@@ -18,6 +18,7 @@
 #include <ranges>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "easylogging++.h"
@@ -127,20 +128,15 @@ const vki::Swapchain VulkanApplication::createSwapChain(
                           presentQueueFamily, instance.getSurface(), window);
 };
 
-vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC>
-pickGraphicsQueueFamily(
+vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC,
+                       vki::QueueOperationType::PRESENT>
+pickGraphicsAndPresentQueueFamily(
     const std::vector<std::shared_ptr<vki::QueueFamily>> &families) {
     return { .family = *std::ranges::find_if(families, [](const auto &family) {
                  return family->supportedOperations.contains(
-                     vki::QueueOperationType::GRAPHIC);
-             }) };
-};
-
-vki::QueueFamilyWithOp<vki::QueueOperationType::PRESENT> pickPresentQueueFamily(
-    const std::vector<std::shared_ptr<vki::QueueFamily>> &families) {
-    return { .family = *std::ranges::find_if(families, [](const auto &family) {
-                 return family->supportedOperations.contains(
-                     vki::QueueOperationType::PRESENT);
+                            vki::QueueOperationType::GRAPHIC) &&
+                        family->supportedOperations.contains(
+                            vki::QueueOperationType::PRESENT);
              }) };
 };
 
@@ -153,23 +149,25 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
     const auto &queueFamilies = physicalDevice.getQueueFamilies();
     logger->info(
         std::format("Picked physical device: {}", (std::string)physicalDevice));
-    const auto &graphicsQueueFamily = pickGraphicsQueueFamily(queueFamilies);
-    logger->info(std::format("Picked graphics queue family: {}",
-                             (std::string)*graphicsQueueFamily.family));
-    const auto &presentQueueFamily = pickPresentQueueFamily(queueFamilies);
-    logger->info(std::format("Picked present queue family: {}",
-                             (std::string)*presentQueueFamily.family));
-    const vki::LogicalDevice logicalDevice =
-        vki::LogicalDevice(physicalDevice, *graphicsQueueFamily.family,
-                           *presentQueueFamily.family);
+    const auto &graphicsAndPresentQueueFamily =
+        pickGraphicsAndPresentQueueFamily(queueFamilies);
+    logger->info(
+        std::format("Picked graphics and present queue family: {}",
+                    (std::string)*graphicsAndPresentQueueFamily.family));
+    const vki::QueueCreateInfo<1, vki::QueueOperationType::GRAPHIC,
+                               vki::QueueOperationType::PRESENT>
+        &graphicAndPresentQueueCreateInfo = {
+            .queueFamily = graphicsAndPresentQueueFamily,
+        };
+    const vki::LogicalDevice logicalDevice = vki::LogicalDevice(
+        physicalDevice, std::make_tuple(graphicAndPresentQueueCreateInfo));
     logger->info("Created logical device");
-    const auto &graphicsQueue = logicalDevice.getQueue(graphicsQueueFamily);
+    const auto &queue =
+        logicalDevice.getQueue<0>(graphicAndPresentQueueCreateInfo);
     logger->info("Created graphics queue");
-    const auto &presentQueue = logicalDevice.getQueue(presentQueueFamily);
-    logger->info("Created present queue");
     const vki::Swapchain &swapchain = createSwapChain(
-        physicalDevice, logicalDevice, *graphicsQueueFamily.family,
-        *presentQueueFamily.family, window);
+        physicalDevice, logicalDevice, *graphicsAndPresentQueueFamily.family,
+        *graphicsAndPresentQueueFamily.family, window);
     logger->info("Created swapchain");
     const auto renderPass = vki::RenderPass(swapChainFormat, logicalDevice);
     logger->info("Created render pass");
@@ -188,7 +186,8 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
         }) |
         std::ranges::to<std::vector>();
     logger->info("Created framebuffers");
-    const auto &commandPool = vki::CommandPool(logicalDevice, graphicsQueue);
+    const auto &commandPool =
+        vki::CommandPool(logicalDevice, graphicsAndPresentQueueFamily);
     logger->info("Created command pool");
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -227,8 +226,7 @@ VulkanApplication::VulkanApplication(vki::VulkanInstanceParams params,
         controller.pollEvents();
         drawFrame(logicalDevice, swapchain, renderPass, pipeline, framebuffers,
                   commandBuffer, inFlightFence, imageAvailableSemaphore,
-                  renderFinishedSemaphore, vertexBuffer, graphicsQueue,
-                  presentQueue);
+                  renderFinishedSemaphore, vertexBuffer, queue, queue);
     };
 
     logger->info("Waiting for queued operations to complete...");
@@ -280,8 +278,8 @@ void VulkanApplication::drawFrame(
     const vki::Semaphore &imageAvailableSemaphore,
     const vki::Semaphore &renderFinishedSemaphore,
     const vki::Buffer &vertexBuffer,
-    const vki::Queue<vki::QueueOperationType::GRAPHIC> &graphicsQueue,
-    const vki::Queue<vki::QueueOperationType::PRESENT> &presentQueue) {
+    const vki::GraphicsQueueMixin &graphicsQueue,
+    const vki::PresentQueueMixin &presentQueue) {
     inFlightFence.wait();
 
     uint32_t imageIndex =

@@ -57,3 +57,4 @@ const VkSubmitInfo vki::SubmitInfo::getVkSubmitInfo() const {
                  static_cast<uint32_t>(signalSemaphores.size()),
              .pSignalSemaphores = signalSemaphores.data() };
 };
+

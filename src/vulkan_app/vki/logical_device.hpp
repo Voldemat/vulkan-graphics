@@ -3,36 +3,45 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <cstdint>
+#include <tuple>
+#include <vector>
 
 #include "./physical_device.hpp"
 #include "vulkan_app/vki/queue.hpp"
+#include "vulkan_app/vki/structs.hpp"
 
 namespace vki {
 class LogicalDevice {
     VkDevice device;
     LogicalDevice(const LogicalDevice &other) = delete;
+    void init(const vki::PhysicalDevice &physicalDevice,
+              const std::vector<VkDeviceQueueCreateInfo> &queueCreateInfoArray);
 
 public:
-    uint32_t graphicsQueueIndex;
-    uint32_t presentQueueIndex;
+    template <typename... T>
     explicit LogicalDevice(const vki::PhysicalDevice &physicalDevice,
-                           const vki::QueueFamily &graphicsQueueFamily,
-                           const vki::QueueFamily &presentQueueFamily);
+                           const std::tuple<T...> &queueInfoArray) {
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfoArray;
+        std::apply(
+            [&queueCreateInfoArray](auto &&...args) {
+                ((queueCreateInfoArray.push_back(args.getVkCreateInfo()), ...));
+            },
+            queueInfoArray);
+        init(physicalDevice, queueCreateInfoArray);
+    };
     LogicalDevice(LogicalDevice &&other);
-    template <enum vki::QueueOperationType T>
-    vki::Queue<T> getQueue(const vki::QueueFamilyWithOp<T> &queueFamily) const;
-    vki::Queue<vki::QueueOperationType::PRESENT> getQueue(
-        const vki::QueueFamilyWithOp<vki::QueueOperationType::PRESENT>
-            &presentQueueFamily) const;
-    vki::Queue<vki::QueueOperationType::GRAPHIC> getQueue(
-        const vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC>
-            &graphicQueueFamily) const;
+    template <unsigned int QueueIndex, enum vki::QueueOperationType... T>
+    vki::Queue<T...> getQueue(
+        const vki::QueueCreateInfo<QueueIndex + 1, T...> &createInfo) const {
+        unsigned int queueFamilyIndex = createInfo.queueFamily.family->index;
+        VkQueue queue;
+        vkGetDeviceQueue(device, queueFamilyIndex, QueueIndex, &queue);
+        return vki::Queue<T...>(queue, queueFamilyIndex);
+    };
     const VkDevice getVkDevice() const noexcept;
     void waitIdle() const;
     ~LogicalDevice();
 };
-
 };  // namespace vki
 
 #endif

@@ -58,8 +58,8 @@ public:
         const vki::Semaphore &imageAvailableSemaphore,
         const vki::Semaphore &renderFinishedSemaphore,
         const vki::Buffer &vertexBuffer,
-        const vki::Queue<vki::QueueOperationType::GRAPHIC> &graphicsQueue,
-        const vki::Queue<vki::QueueOperationType::PRESENT> &presentQueue);
+        const vki::GraphicsQueueMixin &graphicsQueue,
+        const vki::PresentQueueMixin &presentQueue);
     VulkanApplication(const VulkanApplication &other) = delete;
     VulkanApplication(vki::VulkanInstanceParams params,
                       const GLFWController &controller,

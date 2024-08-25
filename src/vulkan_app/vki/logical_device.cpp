@@ -7,33 +7,11 @@
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/queue.hpp"
+#include "vulkan_app/vki/structs.hpp"
 
-vki::LogicalDevice::LogicalDevice(const vki::PhysicalDevice &physicalDevice,
-                                  const vki::QueueFamily &graphicsQueueFamily,
-                                  const vki::QueueFamily &presentQueueFamily) {
-    float queuePriority = 1.0f;
-    graphicsQueueIndex = graphicsQueueFamily.index;
-    presentQueueIndex = presentQueueFamily.index;
-
-    VkDeviceQueueCreateInfo graphicsQueueCreateInfo{};
-    graphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    graphicsQueueCreateInfo.queueFamilyIndex = graphicsQueueIndex;
-    graphicsQueueCreateInfo.queueCount = 1;
-    graphicsQueueCreateInfo.pQueuePriorities = &queuePriority;
-
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfoArray;
-    queueCreateInfoArray.push_back(graphicsQueueCreateInfo);
-    if (presentQueueIndex != graphicsQueueIndex) {
-        VkDeviceQueueCreateInfo presentQueueCreateInfo{};
-        presentQueueCreateInfo.sType =
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        presentQueueCreateInfo.queueFamilyIndex = presentQueueIndex;
-        presentQueueCreateInfo.queueCount = 1;
-        presentQueueCreateInfo.pQueuePriorities = &queuePriority;
-
-        queueCreateInfoArray.push_back(presentQueueCreateInfo);
-    };
-
+void vki::LogicalDevice::init(
+    const vki::PhysicalDevice &physicalDevice,
+    const std::vector<VkDeviceQueueCreateInfo> &queueCreateInfoArray) {
     std::vector<const char *> deviceExtensions;
     deviceExtensions.push_back("VK_KHR_portability_subset");
     deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -68,22 +46,3 @@ const VkDevice vki::LogicalDevice::getVkDevice() const noexcept {
 
 void vki::LogicalDevice::waitIdle() const { vkDeviceWaitIdle(device); };
 
-vki::Queue<vki::QueueOperationType::PRESENT> vki::LogicalDevice::getQueue(
-    const vki::QueueFamilyWithOp<vki::QueueOperationType::PRESENT>
-        &presentQueueFamily) const {
-    VkQueue queue;
-    vkGetDeviceQueue(getVkDevice(), presentQueueFamily.family->index, 0,
-                     &queue);
-    return vki::Queue<vki::QueueOperationType::PRESENT>(
-        queue, presentQueueFamily.family->index);
-};
-
-vki::Queue<vki::QueueOperationType::GRAPHIC> vki::LogicalDevice::getQueue(
-    const vki::QueueFamilyWithOp<vki::QueueOperationType::GRAPHIC>
-        &graphicsQueueFamily) const {
-    VkQueue queue;
-    vkGetDeviceQueue(getVkDevice(), graphicsQueueFamily.family->index, 0,
-                     &queue);
-    return vki::Queue<vki::QueueOperationType::GRAPHIC>(
-        queue, graphicsQueueFamily.family->index);
-};
