@@ -2,7 +2,12 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <memory>
+#include <ranges>
+#include <vector>
+
 #include "vulkan_app/vki/base.hpp"
+#include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
 
 vki::CommandBuffer::CommandBuffer(const VkCommandPool &commandPool,
@@ -58,6 +63,25 @@ void vki::CommandBuffer::bindPipeline(
 
 void vki::CommandBuffer::endRenderPass() const {
     vkCmdEndRenderPass(vkCommandBuffer);
+};
+
+void vki::CommandBuffer::draw(const vki::DrawArgs &args) const {
+    vkCmdDraw(vkCommandBuffer, args.vertexCount, args.instanceCount,
+              args.firstVertex, args.firstInstance);
+};
+
+void vki::CommandBuffer::bindVertexBuffers(
+    const BindVertexBuffersArgs &args) const {
+    std::vector<VkBuffer> vertexBuffers =
+        args.buffers |
+        std::views::transform([](const std::shared_ptr<vki::Buffer> &buffer) {
+            return buffer->getVkBuffer();
+        }) |
+        std::ranges::to<std::vector>();
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(vkCommandBuffer, args.firstBinding,
+                           args.bindingCount, vertexBuffers.data(),
+                           args.offsets.data());
 };
 
 VkRenderPassBeginInfo vki::RenderPassBeginInfo::toVkBeginInfo() const {

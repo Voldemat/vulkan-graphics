@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
@@ -36,6 +37,20 @@ struct RenderPassBeginInfo {
     VkRenderPassBeginInfo toVkBeginInfo() const;
 };
 
+struct DrawArgs {
+    unsigned int vertexCount;
+    unsigned int instanceCount;
+    unsigned int firstVertex = 0;
+    unsigned int firstInstance = 0;
+};
+
+struct BindVertexBuffersArgs {
+    unsigned int firstBinding;
+    unsigned int bindingCount;
+    std::vector<std::shared_ptr<vki::Buffer>> buffers;
+    std::vector<VkDeviceSize> offsets;
+};
+
 class CommandBuffer {
     VkCommandBuffer vkCommandBuffer;
 
@@ -56,5 +71,7 @@ public:
         const vki::GraphicsPipeline &pipeline,
         const vki::PipelineBindPointType &pipelineBindPointType) const;
     void endRenderPass() const;
+    void draw(const DrawArgs& args) const;
+    void bindVertexBuffers(const BindVertexBuffersArgs& args) const;
 };
 };  // namespace vki

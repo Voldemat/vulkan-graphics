@@ -2,6 +2,7 @@
 #define VKI_FRAMEBUFFER
 
 #include <vulkan/vulkan_core.h>
+
 #include <memory>
 
 #include "vulkan_app/vki/render_pass.hpp"
@@ -15,12 +16,13 @@ class Framebuffer {
 
 public:
     explicit Framebuffer(const vki::Swapchain &swapchain,
-                         const std::shared_ptr<vki::RenderPass> &renderPass, VkExtent2D extent,
+                         const std::shared_ptr<vki::RenderPass> &renderPass,
+                         VkExtent2D extent,
                          const vki::LogicalDevice &logicalDevice,
                          const VkImageView imageView);
     VkFramebuffer getVkFramebuffer() const;
-    Framebuffer(const Framebuffer&) = delete;
-    Framebuffer(const Framebuffer&&) = delete;
+    Framebuffer(const Framebuffer &) = delete;
+    Framebuffer(const Framebuffer &&) = delete;
     ~Framebuffer();
 };
 };  // namespace vki

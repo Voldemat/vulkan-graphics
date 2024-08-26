@@ -1,11 +1,8 @@
-#ifndef VKI_MEMORY
-#define VKI_MEMORY
-
+#pragma once
 #include <vulkan/vulkan_core.h>
 
-#include "vulkan_app/vki/logical_device.hpp"
-
 namespace vki {
+class LogicalDevice;
 class Memory {
     VkDeviceMemory vkMemory;
     const VkDevice device;
@@ -19,5 +16,3 @@ public:
     ~Memory();
 };
 };  // namespace vki
-
-#endif

@@ -4,16 +4,17 @@
 #include <memory>
 #include <optional>
 
-#include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/memory.hpp"
 
 namespace vki {
+class LogicalDevice;
 class Buffer {
     VkBuffer vkBuffer;
     VkDevice device;
     std::optional<std::shared_ptr<vki::Memory>> memory;
 
 public:
+    Buffer(const Buffer& other) = delete;
     explicit Buffer(const vki::LogicalDevice &logicalDevice,
                     VkBufferCreateInfo createInfo);
     VkBuffer getVkBuffer() const;

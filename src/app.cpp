@@ -104,7 +104,7 @@ void drawFrame(
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
     const vki::Semaphore &renderFinishedSemaphore,
-    const vki::Buffer &vertexBuffer,
+    const std::shared_ptr<vki::Buffer> &vertexBuffer,
     const vki::GraphicsQueueMixin &graphicsQueue,
     const vki::PresentQueueMixin &presentQueue);
 
@@ -113,7 +113,7 @@ void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
                          const std::shared_ptr<vki::RenderPass> &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
-                         const vki::Buffer &vertexBuffer);
+                         const std::shared_ptr<vki::Buffer> &vertexBuffer);
 
 void run_app() {
     auto &mainLogger = *el::Loggers::getLogger("main");
@@ -180,9 +180,10 @@ void run_app() {
     bufferInfo.size = sizeof(vertices[0]) * vertices.size();
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    auto vertexBuffer = vki::Buffer(logicalDevice, bufferInfo);
+    auto vertexBuffer =
+        std::make_shared<vki::Buffer>(logicalDevice, bufferInfo);
     mainLogger.info("Created vertex buffer");
-    const auto &memoryRequirements = vertexBuffer.getMemoryRequirements();
+    const auto &memoryRequirements = vertexBuffer->getMemoryRequirements();
     const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &memoryTypeIndex = vki::utils::findMemoryType(
         memoryRequirements.memoryTypeBits, memoryProperties,
@@ -195,7 +196,7 @@ void run_app() {
     const auto &vertexBufferMemory =
         std::make_shared<vki::Memory>(logicalDevice, allocInfo);
     mainLogger.info("Created vertex buffer memory");
-    vertexBuffer.bindMemory(vertexBufferMemory);
+    vertexBuffer->bindMemory(vertexBufferMemory);
     void *data;
     vertexBufferMemory->mapMemory(bufferInfo.size, &data);
     memcpy(data, vertices.data(), (size_t)bufferInfo.size);
@@ -316,7 +317,7 @@ void drawFrame(
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
     const vki::Semaphore &renderFinishedSemaphore,
-    const vki::Buffer &vertexBuffer,
+    const std::shared_ptr<vki::Buffer> &vertexBuffer,
     const vki::GraphicsQueueMixin &graphicsQueue,
     const vki::PresentQueueMixin &presentQueue) {
     inFlightFence.wait();
@@ -346,7 +347,7 @@ void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
                          const std::shared_ptr<vki::RenderPass> &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
-                         const vki::Buffer &vertexBuffer) {
+                         const std::shared_ptr<vki::Buffer> &vertexBuffer) {
     commandBuffer.begin();
 
     VkClearValue clearColor = { .color = {
@@ -360,11 +361,16 @@ void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
     commandBuffer.beginRenderPass(renderPassBeginInfo,
                                   vki::SubpassContentsType::INLINE);
     commandBuffer.bindPipeline(pipeline, vki::PipelineBindPointType::GRAPHICS);
-    VkBuffer vertexBuffers[] = { vertexBuffer.getVkBuffer() };
-    VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(commandBuffer.getVkCommandBuffer(), 0, 1,
-                           vertexBuffers, offsets);
-    vkCmdDraw(commandBuffer.getVkCommandBuffer(), 3, 1, 0, 0);
+    commandBuffer.bindVertexBuffers({
+        .firstBinding = 0,
+        .bindingCount = 1,
+        .buffers = { vertexBuffer },
+        .offsets = { 0 },
+    });
+    commandBuffer.draw({ .vertexCount = 3,
+                         .instanceCount = 1,
+                         .firstVertex = 0,
+                         .firstInstance = 0 });
     commandBuffer.endRenderPass();
     commandBuffer.end();
 };
