@@ -3,8 +3,8 @@
 
 #include <vulkan/vulkan_core.h>
 #include <vector>
-#include "vulkan_app/vki/logical_device.hpp"
 namespace vki {
+class LogicalDevice;
 class ShaderModule {
     VkShaderModule vkShaderModule;
     VkDevice device;

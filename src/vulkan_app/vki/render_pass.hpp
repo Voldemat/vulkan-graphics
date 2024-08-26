@@ -2,14 +2,14 @@
 #define VKI_RENDER_PASS
 #include <vulkan/vulkan_core.h>
 
-#include "./logical_device.hpp"
-
 namespace vki {
+class LogicalDevice;
 class RenderPass {
     VkRenderPass vkRenderPass;
     const vki::LogicalDevice& device;
 
 public:
+    RenderPass(const RenderPass& other) = delete;
     explicit RenderPass(VkFormat format,
                         const vki::LogicalDevice &logicalDevice);
     const VkRenderPass getVkRenderPass() const;

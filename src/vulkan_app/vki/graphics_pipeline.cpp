@@ -2,6 +2,8 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <memory>
+
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/pipeline_layout.hpp"
@@ -12,9 +14,9 @@ vki::GraphicsPipeline::GraphicsPipeline(
     const vki::ShaderModule &vertShader,
     const vki::ShaderModule &fragmentShader, VkExtent2D extent,
     const vki::PipelineLayout &pipelineLayout,
-    const vki::RenderPass &renderPass, const vki::LogicalDevice &logicalDevice,
-    VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo
-    )
+    const std::shared_ptr<vki::RenderPass> &renderPass,
+    const vki::LogicalDevice &logicalDevice,
+    VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo)
     : device{ logicalDevice.getVkDevice() } {
     VkPipelineShaderStageCreateInfo vertexShaderCreateInfo{};
     vertexShaderCreateInfo.sType =
@@ -33,7 +35,6 @@ vki::GraphicsPipeline::GraphicsPipeline(
     VkPipelineShaderStageCreateInfo shaderStages[] = {
         vertexShaderCreateInfo, fragmentShaderCreateInfo
     };
-
 
     VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyCreateInfo{};
     pipelineInputAssemblyCreateInfo.sType =
@@ -107,7 +108,7 @@ vki::GraphicsPipeline::GraphicsPipeline(
     pipelineInfo.pMultisampleState = &multisample;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.layout = pipelineLayout.getVkPipelineLayout();
-    pipelineInfo.renderPass = renderPass.getVkRenderPass();
+    pipelineInfo.renderPass = renderPass->getVkRenderPass();
     pipelineInfo.subpass = 0;
 
     VkResult result =

@@ -21,7 +21,6 @@
 #include "./glfw_controller.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
-#include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
@@ -61,7 +60,7 @@ const vki::Swapchain createSwapChain(
 
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const vki::RenderPass &renderPass,
+    const std::shared_ptr<vki::RenderPass> &renderPass,
     const vki::PipelineLayout &pipelineLayout);
 
 struct Vertex {
@@ -99,7 +98,8 @@ const std::vector<Vertex> vertices = {
 
 void drawFrame(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const vki::RenderPass &renderPass, const vki::GraphicsPipeline &pipeline,
+    const std::shared_ptr<vki::RenderPass> &renderPass,
+    const vki::GraphicsPipeline &pipeline,
     const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers,
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
@@ -110,7 +110,7 @@ void drawFrame(
 
 void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
                          const vki::Swapchain &swapchain,
-                         const vki::RenderPass &renderPass,
+                         const std::shared_ptr<vki::RenderPass> &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
                          const vki::Buffer &vertexBuffer);
@@ -156,7 +156,7 @@ void run_app() {
                         *queueFamily.family, *queueFamily.family, window);
     mainLogger.info("Created swapchain");
     const auto renderPass =
-        vki::RenderPass(swapchain.getFormat(), logicalDevice);
+        std::make_shared<vki::RenderPass>(swapchain.getFormat(), logicalDevice);
     mainLogger.info("Created render pass");
     const auto pipelineLayout = vki::PipelineLayout(logicalDevice);
     mainLogger.info("Created pipeline layout");
@@ -288,7 +288,7 @@ std::vector<char> readFile(const std::string &filename) {
 
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const vki::RenderPass &renderPass,
+    const std::shared_ptr<vki::RenderPass> &renderPass,
     const vki::PipelineLayout &pipelineLayout) {
     auto vertShaderCode = readFile("../src/shaders/vertex.spv");
     auto fragmentShaderCode = readFile("../src/shaders/fragment.spv");
@@ -310,7 +310,8 @@ vki::GraphicsPipeline createGraphicsPipeline(
 
 void drawFrame(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const vki::RenderPass &renderPass, const vki::GraphicsPipeline &pipeline,
+    const std::shared_ptr<vki::RenderPass> &renderPass,
+    const vki::GraphicsPipeline &pipeline,
     const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers,
     const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
     const vki::Semaphore &imageAvailableSemaphore,
@@ -342,39 +343,28 @@ void drawFrame(
 
 void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
                          const vki::Swapchain &swapchain,
-                         const vki::RenderPass &renderPass,
+                         const std::shared_ptr<vki::RenderPass> &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
                          const vki::Buffer &vertexBuffer) {
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    VkResult result =
-        vkBeginCommandBuffer(commandBuffer.getVkCommandBuffer(), &beginInfo);
-    vki::assertSuccess(result, "vkBeginCommandBuffer");
+    commandBuffer.begin();
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass.getVkRenderPass();
-    renderPassInfo.framebuffer = framebuffer->getVkFramebuffer();
-    renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent = swapchain.getExtent();
-
-    VkClearValue clearColor = { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
-
-    vkCmdBeginRenderPass(commandBuffer.getVkCommandBuffer(), &renderPassInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
-
-    vkCmdBindPipeline(commandBuffer.getVkCommandBuffer(),
-                      VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipeline.getVkPipeline());
+    VkClearValue clearColor = { .color = {
+                                    .float32 = { 0.0f, 0.0f, 0.0f, 1.0f } } };
+    vki::RenderPassBeginInfo renderPassBeginInfo = {
+        .renderPass = renderPass,
+        .framebuffer = framebuffer,
+        .clearValues = { clearColor },
+        .renderArea = { .offset = { 0, 0 }, .extent = swapchain.getExtent() }
+    };
+    commandBuffer.beginRenderPass(renderPassBeginInfo,
+                                  vki::SubpassContentsType::INLINE);
+    commandBuffer.bindPipeline(pipeline, vki::PipelineBindPointType::GRAPHICS);
     VkBuffer vertexBuffers[] = { vertexBuffer.getVkBuffer() };
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(commandBuffer.getVkCommandBuffer(), 0, 1,
                            vertexBuffers, offsets);
     vkCmdDraw(commandBuffer.getVkCommandBuffer(), 3, 1, 0, 0);
-    vkCmdEndRenderPass(commandBuffer.getVkCommandBuffer());
-    result = vkEndCommandBuffer(commandBuffer.getVkCommandBuffer());
-    vki::assertSuccess(result, "vkEndCommandBuffer");
+    commandBuffer.endRenderPass();
+    commandBuffer.end();
 };
