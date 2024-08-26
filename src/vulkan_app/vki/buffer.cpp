@@ -1,7 +1,6 @@
 #include "./buffer.hpp"
 
 #include <vulkan/vulkan_core.h>
-#include <memory>
 
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
@@ -22,9 +21,9 @@ VkMemoryRequirements vki::Buffer::getMemoryRequirements() const {
     return memRequirements;
 };
 
-void vki::Buffer::bindMemory(const std::shared_ptr<vki::Memory> &newMemory) {
+void vki::Buffer::bindMemory(const vki::Memory &newMemory) {
     memory = newMemory;
-    vkBindBufferMemory(device, vkBuffer, newMemory->getVkMemory(), 0);
+    vkBindBufferMemory(device, vkBuffer, newMemory.getVkMemory(), 0);
 };
 
 vki::Buffer::~Buffer() { vkDestroyBuffer(device, vkBuffer, nullptr); };

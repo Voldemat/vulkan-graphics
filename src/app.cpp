@@ -194,13 +194,13 @@ void run_app() {
     allocInfo.allocationSize = memoryRequirements.size;
     allocInfo.memoryTypeIndex = memoryTypeIndex;
     const auto &vertexBufferMemory =
-        std::make_shared<vki::Memory>(logicalDevice, allocInfo);
+        vki::Memory(logicalDevice, allocInfo);
     mainLogger.info("Created vertex buffer memory");
     vertexBuffer->bindMemory(vertexBufferMemory);
     void *data;
-    vertexBufferMemory->mapMemory(bufferInfo.size, &data);
+    vertexBufferMemory.mapMemory(bufferInfo.size, &data);
     memcpy(data, vertices.data(), (size_t)bufferInfo.size);
-    vertexBufferMemory->unmapMemory();
+    vertexBufferMemory.unmapMemory();
     mainLogger.info("Filled vertex buffer memory");
     const auto &commandBuffer = commandPool.createCommandBuffer();
     mainLogger.info("Created command buffer");

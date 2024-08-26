@@ -5,9 +5,11 @@
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 
+vki::Memory::Memory(const vki::Memory &other)
+    : vki::Borrowable(other), device{ other.device }, vkMemory{ other.vkMemory } {};
 vki::Memory::Memory(const vki::LogicalDevice &logicalDevice,
                     VkMemoryAllocateInfo allocInfo)
-    : device{ logicalDevice.getVkDevice() } {
+    : vki::Borrowable(), device{ logicalDevice.getVkDevice() } {
     VkResult result = vkAllocateMemory(device, &allocInfo, nullptr, &vkMemory);
     vki::assertSuccess(result, "vkAllocateMemory");
 };
@@ -21,4 +23,8 @@ void vki::Memory::mapMemory(VkDeviceSize size, void **buffer) const {
 
 void vki::Memory::unmapMemory() const { vkUnmapMemory(device, vkMemory); };
 
-vki::Memory::~Memory() { vkFreeMemory(device, vkMemory, nullptr); };
+vki::Memory::~Memory() {
+    if (is_owner) {
+        vkFreeMemory(device, vkMemory, nullptr);
+    };
+};
