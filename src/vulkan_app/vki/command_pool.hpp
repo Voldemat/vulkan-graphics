@@ -1,11 +1,11 @@
-#ifndef VKI_COMMAND_POOL
-#define VKI_COMMAND_POOL
+#pragma once
 
 #include <vulkan/vulkan_core.h>
 
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
-#include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/queue_family.hpp"
+
 namespace vki {
 class CommandPool {
     VkCommandPool vkCommandPool;
@@ -29,4 +29,3 @@ public:
     ~CommandPool();
 };
 };  // namespace vki
-#endif

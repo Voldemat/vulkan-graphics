@@ -1,5 +1,5 @@
-#ifndef VKI_GRAPHICS_PIPELINE
-#define VKI_GRAPHICS_PIPELINE
+#pragma once
+
 #include <vulkan/vulkan_core.h>
 #include <memory>
 
@@ -25,4 +25,3 @@ public:
     ~GraphicsPipeline();
 };
 };  // namespace vki
-#endif

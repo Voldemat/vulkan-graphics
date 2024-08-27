@@ -1,5 +1,4 @@
-#ifndef VKI_LOGICAL_DEVICE
-#define VKI_LOGICAL_DEVICE
+#pragma once
 
 #include <vulkan/vulkan_core.h>
 
@@ -8,6 +7,7 @@
 
 #include "./physical_device.hpp"
 #include "vulkan_app/vki/queue.hpp"
+#include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/structs.hpp"
 
 namespace vki {
@@ -53,5 +53,3 @@ public:
 };
 
 };  // namespace vki
-
-#endif

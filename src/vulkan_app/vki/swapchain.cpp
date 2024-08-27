@@ -4,58 +4,61 @@
 
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <vector>
 
 #include "./base.hpp"
 #include "./logical_device.hpp"
-#include "./physical_device.hpp"
-#include "glfw_controller.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/surface.hpp"
 
-vki::Swapchain::Swapchain(const vki::LogicalDevice &logicalDevice,
-                          const vki::PhysicalDevice &physicalDevice,
-                          const vki::QueueFamily &graphicsQueueFamily,
-                          const vki::QueueFamily &presentQueueFamily,
-                          const vki::Surface &surface,
-                          const GLFWControllerWindow &window)
-    : device{ logicalDevice.getVkDevice() } {
-    auto details = physicalDevice.getSwapchainDetails(surface);
-    auto surfaceFormat = details.chooseFormat();
-    format = surfaceFormat.format;
-    auto presentMode = details.choosePresentMode();
-    extent = details.chooseSwapExtent(window);
-    uint32_t imageCount = details.getImageCount();
-    VkSwapchainCreateInfoKHR createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface.getVkSurfaceKHR();
-    createInfo.minImageCount = imageCount;
-    createInfo.imageFormat = format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = extent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    createInfo.preTransform = details.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-    unsigned int graphicsQueueIndex, presentQueueIndex;
-    graphicsQueueIndex = graphicsQueueFamily.index;
-    presentQueueIndex = presentQueueFamily.index;
-    if (graphicsQueueIndex != presentQueueIndex) {
-        std::vector<uint32_t> queueIndices = { graphicsQueueIndex,
-                                               presentQueueIndex };
+vki::SwapchainCreateInfo::SwapchainCreateInfo(
+    const vki::SwapchainCreateInfoInput &input)
+    : surface{ input.surface },
+      extent{ input.extent },
+      presentMode{ input.presentMode },
+      format{ input.format },
+      minImageCount{ input.minImageCount },
+      preTransform{ input.preTransform } {
+    if (input.graphicsQueueFamily->index != input.presentQueueFamily->index) {
+        queueIndices = { input.graphicsQueueFamily->index,
+                         input.presentQueueFamily->index };
+    };
+};
+
+VkSwapchainCreateInfoKHR vki::SwapchainCreateInfo::toVkCreateInfo() const {
+    VkSwapchainCreateInfoKHR createInfo = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface = surface.getVkSurfaceKHR(),
+        .minImageCount = minImageCount,
+        .imageFormat = format.format,
+        .imageColorSpace = format.colorSpace,
+        .imageExtent = extent,
+        .imageArrayLayers = 1,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = nullptr,
+        .preTransform = preTransform,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = presentMode,
+        .clipped = VK_TRUE,
+        .oldSwapchain = VK_NULL_HANDLE,
+    };
+    if (queueIndices.has_value()) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueIndices.data();
-    } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        createInfo.queueFamilyIndexCount = 0;
-        createInfo.pQueueFamilyIndices = nullptr;
+        createInfo.pQueueFamilyIndices = queueIndices.value().data();
     };
-    VkResult result = vkCreateSwapchainKHR(logicalDevice.getVkDevice(),
-                                           &createInfo, nullptr, &vkSwapchain);
+    return createInfo;
+};
+
+vki::Swapchain::Swapchain(const vki::LogicalDevice &logicalDevice,
+                          const vki::SwapchainCreateInfo &createInfo)
+    : device{ logicalDevice.getVkDevice() } {
+    const auto &vkCreateInfo = createInfo.toVkCreateInfo();
+    VkResult result = vkCreateSwapchainKHR(
+        logicalDevice.getVkDevice(), &vkCreateInfo, nullptr, &vkSwapchain);
     assertSuccess(result, "vkCreateSwapchainKHR");
 
     uint32_t swapChainImageCount;
@@ -67,15 +70,7 @@ vki::Swapchain::Swapchain(const vki::LogicalDevice &logicalDevice,
         vkGetSwapchainImagesKHR(logicalDevice.getVkDevice(), vkSwapchain,
                                 &swapChainImageCount, swapChainImages.data());
     assertSuccess(result, "vkGetSwapchainImagesKHR");
-    createImageViews(logicalDevice, format);
-};
-
-const VkFormat vki::Swapchain::getFormat() const {
-    return format;
-};
-
-const VkExtent2D vki::Swapchain::getExtent() const {
-    return extent;
+    createImageViews(logicalDevice, vkCreateInfo.imageFormat);
 };
 
 void vki::Swapchain::createImageViews(const vki::LogicalDevice &logicalDevice,

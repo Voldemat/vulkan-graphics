@@ -1,5 +1,5 @@
-#ifndef VKI_FENCE
-#define VKI_FENCE
+#pragma once
+
 #include <vulkan/vulkan_core.h>
 
 namespace vki {
@@ -7,13 +7,13 @@ class LogicalDevice;
 class Fence {
     VkFence vkFence;
     VkDevice device;
+
 public:
-    explicit Fence(const vki::LogicalDevice& logicalDevice);
-    Fence(const Fence&) = delete;
-    Fence(const Fence&&) = delete;
+    explicit Fence(const vki::LogicalDevice &logicalDevice);
+    Fence(const Fence &) = delete;
+    Fence(const Fence &&) = delete;
     const VkFence getVkFence() const;
     void wait() const;
     ~Fence();
 };
-};
-#endif
+};  // namespace vki

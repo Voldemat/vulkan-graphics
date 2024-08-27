@@ -1,5 +1,4 @@
-#ifndef VKI_FRAMEBUFFER
-#define VKI_FRAMEBUFFER
+#pragma once
 
 #include <vulkan/vulkan_core.h>
 
@@ -26,4 +25,3 @@ public:
     ~Framebuffer();
 };
 };  // namespace vki
-#endif

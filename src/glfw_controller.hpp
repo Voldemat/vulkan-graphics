@@ -1,5 +1,4 @@
-#ifndef GLFW_CONTROLLER
-#define GLFW_CONTROLLER
+#pragma once
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,4 +33,3 @@ public:
 
     ~GLFWController();
 };
-#endif
