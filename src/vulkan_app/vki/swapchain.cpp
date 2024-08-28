@@ -5,25 +5,31 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 #include "./base.hpp"
 #include "./logical_device.hpp"
+#include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/surface.hpp"
 
-vki::SwapchainCreateInfo::SwapchainCreateInfo(
-    const vki::SwapchainCreateInfoInput &input)
-    : surface{ input.surface },
-      extent{ input.extent },
-      presentMode{ input.presentMode },
-      format{ input.format },
-      minImageCount{ input.minImageCount },
-      preTransform{ input.preTransform } {
-    if (input.graphicsQueueFamily->index != input.presentQueueFamily->index) {
-        queueIndices = { input.graphicsQueueFamily->index,
-                         input.presentQueueFamily->index };
+vki::SwapchainSharingInfo::SwapchainSharingInfo(
+    const vki::QueueFamily *graphicsQueueFamily,
+    const vki::QueueFamily *presentQueueFamily) {
+    if (graphicsQueueFamily->index != presentQueueFamily->index) {
+        queueIndices = { graphicsQueueFamily->index,
+                         presentQueueFamily->index };
     };
+};
+
+VkImageUsageFlags vki::imageUsageToVk(
+    const std::unordered_set<vki::ImageUsage> &imageUsages) {
+    VkImageUsageFlags flags;
+    for (const auto &usage : imageUsages) {
+        flags |= static_cast<VkImageUsageFlagBits>(usage);
+    };
+    return flags;
 };
 
 VkSwapchainCreateInfoKHR vki::SwapchainCreateInfo::toVkCreateInfo() const {
@@ -34,21 +40,27 @@ VkSwapchainCreateInfoKHR vki::SwapchainCreateInfo::toVkCreateInfo() const {
         .imageFormat = format.format,
         .imageColorSpace = format.colorSpace,
         .imageExtent = extent,
-        .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageArrayLayers = imageArrayLayers,
+        .imageUsage = imageUsageToVk(imageUsage),
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
         .preTransform = preTransform,
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = presentMode,
-        .clipped = VK_TRUE,
-        .oldSwapchain = VK_NULL_HANDLE,
+        .compositeAlpha =
+            static_cast<VkCompositeAlphaFlagBitsKHR>(compositeAlpha),
+        .presentMode = static_cast<VkPresentModeKHR>(presentMode),
+        .clipped = isClipped ? VK_TRUE : VK_FALSE,
+        .oldSwapchain = oldSwapchain
+                            .transform([](const vki::Swapchain *oldSwapchain) {
+                                return oldSwapchain->getVkSwapchain();
+                            })
+                            .value_or(VK_NULL_HANDLE),
     };
-    if (queueIndices.has_value()) {
+    if (sharingInfo.queueIndices.has_value()) {
+        const auto& queueIndices = sharingInfo.queueIndices.value();
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueIndices.value().data();
+        createInfo.queueFamilyIndexCount = queueIndices.size();
+        createInfo.pQueueFamilyIndices = queueIndices.data();
     };
     return createInfo;
 };
@@ -106,7 +118,9 @@ uint32_t vki::Swapchain::acquireNextImageKHR(
     VkResult result = vkAcquireNextImageKHR(
         device, vkSwapchain, std::numeric_limits<uint32_t>::max(),
         semaphore.getVkSemaphore(), VK_NULL_HANDLE, &imageIndex);
-    assertSuccess(result, "vkAcquireNextImageKHR");
+    if (result != VK_SUBOPTIMAL_KHR) {
+        assertSuccess(result, "vkAcquireNextImageKHR");
+    };
     return imageIndex;
 };
 

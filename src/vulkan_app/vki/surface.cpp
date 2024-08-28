@@ -3,6 +3,8 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <ranges>
+#include <unordered_set>
 #include <vector>
 
 #include "GLFW/glfw3.h"
@@ -43,33 +45,36 @@ VkSurfaceCapabilitiesKHR vki::Surface::getCapabilities(
     return details;
 };
 
-std::vector<VkSurfaceFormatKHR> vki::Surface::getFormats(
+vki::SurfaceFormatSet vki::Surface::getFormats(
     const vki::PhysicalDevice &physicalDevice) const {
-    std::vector<VkSurfaceFormatKHR> formats;
     uint32_t formatCount;
     VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(
         physicalDevice.getVkDevice(), surface, &formatCount, nullptr);
     vki::assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
-    formats.resize(formatCount);
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        physicalDevice.getVkDevice(), surface, &formatCount, formats.data());
+    std::vector<VkSurfaceFormatKHR> formatsData(formatCount);
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice.getVkDevice(),
+                                                  surface, &formatCount,
+                                                  formatsData.data());
     vki::assertSuccess(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    SurfaceFormatSet formats(formatsData.begin(), formatsData.end());
     return formats;
 };
 
-std::vector<VkPresentModeKHR> vki::Surface::getPresentModes(
+std::unordered_set<vki::PresentMode> vki::Surface::getPresentModes(
     const vki::PhysicalDevice &physicalDevice) const {
-    std::vector<VkPresentModeKHR> presentModes;
     uint32_t modesCount;
     VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(
         physicalDevice.getVkDevice(), surface, &modesCount, nullptr);
     vki::assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
-    presentModes.resize(modesCount);
+    std::vector<VkPresentModeKHR> presentModes(modesCount);
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(
         physicalDevice.getVkDevice(), surface, &modesCount,
         presentModes.data());
     vki::assertSuccess(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
-    return presentModes;
+    return presentModes | std::views::transform([](const auto &v) {
+               return vki::PresentMode(v);
+           }) |
+           std::ranges::to<std::unordered_set>();
 };
 
 vki::SurfaceDetails vki::Surface::getDetails(

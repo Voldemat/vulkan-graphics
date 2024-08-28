@@ -59,7 +59,20 @@ std::pair<unsigned int, unsigned int> GLFWControllerWindow::getFramebufferSize()
         throw std::runtime_error("GLFW window framebuffer width must be gte 0");
     };
     if (height >= 0) {
-        throw std::runtime_error("GLFW window framebuffer width must be gte 0");
+        throw std::runtime_error("GLFW window framebuffer height must be gte 0");
+    };
+    return { width, height };
+};
+
+std::pair<unsigned int, unsigned int> GLFWControllerWindow::getWindowSize()
+    const {
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+    if (width >= 0) {
+        throw std::runtime_error("GLFW window width must be gte 0");
+    };
+    if (height >= 0) {
+        throw std::runtime_error("GLFW window height must be gte 0");
     };
     return { width, height };
 };

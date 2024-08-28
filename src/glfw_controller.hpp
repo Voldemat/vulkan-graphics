@@ -17,6 +17,7 @@ public:
     bool shouldClose() const;
     GLFWwindow *getGLFWWindow() const noexcept;
     std::pair<unsigned int, unsigned int> getFramebufferSize() const;
+    std::pair<unsigned int, unsigned int> getWindowSize() const;
     GLFWControllerWindow(const GLFWControllerWindow &other) = delete;
     ~GLFWControllerWindow();
 };

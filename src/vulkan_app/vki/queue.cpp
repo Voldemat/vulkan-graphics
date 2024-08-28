@@ -29,5 +29,7 @@ void vki::PresentQueueMixin::present(
     const vki::PresentInfo &presentInfo) const {
     const auto &finalInfo = presentInfo.getVkPresentInfo();
     VkResult result = vkQueuePresentKHR(getVkQueue(), &finalInfo);
-    vki::assertSuccess(result, "vkQueuePresentKHR");
+    if (result != VK_SUBOPTIMAL_KHR) {
+        vki::assertSuccess(result, "vkQueuePresentKHR");
+    };
 };

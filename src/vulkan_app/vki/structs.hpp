@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "vulkan_app/vki/command_buffer.hpp"
-#include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 namespace vki {

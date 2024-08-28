@@ -11,12 +11,15 @@
 #include <fstream>
 #include <functional>
 #include <ios>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <ranges>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 #include "./glfw_controller.hpp"
@@ -113,24 +116,20 @@ void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
                          const vki::CommandBuffer &commandBuffer,
                          const std::shared_ptr<vki::Buffer> &vertexBuffer);
 
-VkPresentModeKHR choosePresentMode(
-    const std::vector<VkPresentModeKHR> &presentModes) {
-    for (const auto &presentMode : presentModes) {
-        if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return VK_PRESENT_MODE_MAILBOX_KHR;
-        };
-    };
-    return VK_PRESENT_MODE_FIFO_KHR;
+vki::PresentMode choosePresentMode(
+    const std::unordered_set<vki::PresentMode> &presentModes) {
+    if (presentModes.contains(vki::PresentMode::MAILBOX_KHR))
+        return vki::PresentMode::MAILBOX_KHR;
+    return vki::PresentMode::IMMEDIATE_KHR;
 };
 
-VkSurfaceFormatKHR chooseFormat(
-    const std::vector<VkSurfaceFormatKHR> &formats) {
-    for (const auto &format : formats) {
-        if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return format;
-        };
-    };
+const VkSurfaceFormatKHR requiredFormat = {
+    .format = VK_FORMAT_B8G8R8A8_SRGB,
+    .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+};
+
+VkSurfaceFormatKHR chooseFormat(const vki::SurfaceFormatSet &formats) {
+    if (formats.contains(requiredFormat)) return requiredFormat;
     throw std::runtime_error("Required surface format is not found");
 };
 
@@ -141,24 +140,17 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
         return capabilities.currentExtent;
     };
     const auto &[width, height] = window.getFramebufferSize();
-    VkExtent2D actualExtent = { static_cast<uint32_t>(width),
-                                static_cast<uint32_t>(height) };
-    actualExtent.width =
-        std::clamp(actualExtent.width, capabilities.minImageExtent.width,
-                   capabilities.maxImageExtent.width);
-    actualExtent.height =
-        std::clamp(actualExtent.height, capabilities.minImageExtent.height,
-                   capabilities.maxImageExtent.height);
-    return actualExtent;
+    return (VkExtent2D){
+        .width = std::clamp(width, capabilities.minImageExtent.width,
+                            capabilities.maxImageExtent.width),
+        .height = std::clamp(height, capabilities.minImageExtent.height,
+                             capabilities.maxImageExtent.height)
+    };
 };
 
 uint32_t getImageCount(const VkSurfaceCapabilitiesKHR &capabilities) {
-    uint32_t imageCount = capabilities.minImageCount + 1;
-    if (capabilities.maxImageCount > 0 &&
-        imageCount > capabilities.maxImageCount) {
-        imageCount = capabilities.maxImageCount;
-    };
-    return imageCount;
+    return std::clamp(capabilities.minImageCount + 1,
+                      capabilities.minImageCount, capabilities.maxImageCount);
 };
 
 void run_app() {
@@ -204,19 +196,19 @@ void run_app() {
         getImageCount(surfaceDetails.capabilities);
     const auto &swapchainPresentMode =
         choosePresentMode(surfaceDetails.presentModes);
-    const auto &swapchainCreateInfo =
-        vki::SwapchainCreateInfo((vki::SwapchainCreateInfoInput){
-            .surface = surface,
-            .extent = swapchainExtent,
-            .presentMode = swapchainPresentMode,
-            .format = swapchainFormat,
-            .minImageCount = surfaceMinImageCount,
-            .preTransform = surfaceDetails.capabilities.currentTransform,
-            .graphicsQueueFamily = queueFamily.family,
-            .presentQueueFamily = queueFamily.family,
-        });
-    const vki::Swapchain &swapchain =
-        vki::Swapchain(logicalDevice, swapchainCreateInfo);
+    const vki::Swapchain &swapchain = vki::Swapchain(
+        logicalDevice,
+        { .surface = surface,
+          .extent = swapchainExtent,
+          .presentMode = swapchainPresentMode,
+          .format = swapchainFormat,
+          .minImageCount = surfaceMinImageCount,
+          .preTransform = surfaceDetails.capabilities.currentTransform,
+          .imageUsage = { vki::ImageUsage::COLOR_ATTACHMENT },
+          .compositeAlpha = vki::CompositeAlpha::OPAQUE_BIT_KHR,
+          .isClipped = true,
+          .sharingInfo = vki::SwapchainSharingInfo(queueFamily.family,
+                                                   queueFamily.family) });
     mainLogger.info("Created swapchain");
     const auto renderPass = std::make_shared<vki::RenderPass>(
         swapchainFormat.format, logicalDevice);
