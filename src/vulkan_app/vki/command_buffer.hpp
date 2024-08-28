@@ -30,8 +30,8 @@ enum class PipelineBindPointType {
 };
 
 struct RenderPassBeginInfo {
-    std::shared_ptr<vki::RenderPass> renderPass;
-    std::shared_ptr<vki::Framebuffer> framebuffer;
+    vki::RenderPass renderPass;
+    vki::Framebuffer framebuffer;
     std::vector<VkClearValue> clearValues;
     VkRect2D renderArea;
     VkRenderPassBeginInfo toVkBeginInfo() const;
@@ -71,7 +71,7 @@ public:
         const vki::GraphicsPipeline &pipeline,
         const vki::PipelineBindPointType &pipelineBindPointType) const;
     void endRenderPass() const;
-    void draw(const DrawArgs& args) const;
-    void bindVertexBuffers(const BindVertexBuffersArgs& args) const;
+    void draw(const DrawArgs &args) const;
+    void bindVertexBuffers(const BindVertexBuffersArgs &args) const;
 };
 };  // namespace vki

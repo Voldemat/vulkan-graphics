@@ -7,9 +7,9 @@
 
 vki::PipelineLayout::PipelineLayout(const vki::LogicalDevice &logicalDevice)
     : device{ logicalDevice.getVkDevice() } {
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-    pipelineLayoutCreateInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+    };
     VkResult result = vkCreatePipelineLayout(logicalDevice.getVkDevice(),
                                              &pipelineLayoutCreateInfo, nullptr,
                                              &vkPipelineLayout);

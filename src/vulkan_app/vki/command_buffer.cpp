@@ -86,8 +86,8 @@ void vki::CommandBuffer::bindVertexBuffers(
 
 VkRenderPassBeginInfo vki::RenderPassBeginInfo::toVkBeginInfo() const {
     return { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-             .renderPass = renderPass->getVkRenderPass(),
-             .framebuffer = framebuffer->getVkFramebuffer(),
+             .renderPass = renderPass.getVkRenderPass(),
+             .framebuffer = framebuffer.getVkFramebuffer(),
              .renderArea = renderArea,
              .clearValueCount = static_cast<unsigned int>(clearValues.size()),
              .pClearValues = clearValues.data() };

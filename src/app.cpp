@@ -58,8 +58,7 @@ pickQueueFamily(const std::vector<vki::QueueFamily> &families);
 
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent,
-    const std::shared_ptr<vki::RenderPass> &renderPass,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
     const vki::PipelineLayout &pipelineLayout);
 
 struct Vertex {
@@ -95,23 +94,24 @@ const std::vector<Vertex> vertices = {
     { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f } }
 };
 
-void drawFrame(
-    const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent,
-    const std::shared_ptr<vki::RenderPass> &renderPass,
-    const vki::GraphicsPipeline &pipeline,
-    const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers,
-    const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
-    const vki::Semaphore &imageAvailableSemaphore,
-    const vki::Semaphore &renderFinishedSemaphore,
-    const std::shared_ptr<vki::Buffer> &vertexBuffer,
-    const vki::GraphicsQueueMixin &graphicsQueue,
-    const vki::PresentQueueMixin &presentQueue);
+void drawFrame(const vki::LogicalDevice &logicalDevice,
+               const vki::Swapchain &swapchain,
+               const VkExtent2D &swapchainExtent,
+               const vki::RenderPass &renderPass,
+               const vki::GraphicsPipeline &pipeline,
+               const std::vector<vki::Framebuffer> &framebuffers,
+               const vki::CommandBuffer &commandBuffer,
+               const vki::Fence &inFlightFence,
+               const vki::Semaphore &imageAvailableSemaphore,
+               const vki::Semaphore &renderFinishedSemaphore,
+               const std::shared_ptr<vki::Buffer> &vertexBuffer,
+               const vki::GraphicsQueueMixin &graphicsQueue,
+               const vki::PresentQueueMixin &presentQueue);
 
-void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
+void recordCommandBuffer(const vki::Framebuffer &framebuffer,
                          const vki::Swapchain &swapchain,
                          const VkExtent2D &swapchainExtent,
-                         const std::shared_ptr<vki::RenderPass> &renderPass,
+                         const vki::RenderPass &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
                          const std::shared_ptr<vki::Buffer> &vertexBuffer);
@@ -210,22 +210,21 @@ void run_app() {
           .sharingInfo = vki::SwapchainSharingInfo(queueFamily.family,
                                                    queueFamily.family) });
     mainLogger.info("Created swapchain");
-    const auto renderPass = std::make_shared<vki::RenderPass>(
-        swapchainFormat.format, logicalDevice);
+    const auto renderPass =
+        vki::RenderPass(swapchainFormat.format, logicalDevice);
     mainLogger.info("Created render pass");
     const auto pipelineLayout = vki::PipelineLayout(logicalDevice);
     mainLogger.info("Created pipeline layout");
     const auto pipeline = createGraphicsPipeline(
         logicalDevice, swapchain, swapchainExtent, renderPass, pipelineLayout);
     mainLogger.info("Created pipeline");
-    const auto framebuffers =
+    const auto& framebuffers =
         swapchain.swapChainImageViews |
         std::views::transform([&swapchain, &swapchainExtent, &renderPass,
                                &logicalDevice](const auto &imageView) {
-            return std::make_shared<vki::Framebuffer>(swapchain, renderPass,
-                                                      swapchainExtent,
-                                                      logicalDevice, imageView);
-        }) |
+            return vki::Framebuffer(swapchain, renderPass, swapchainExtent,
+                                    logicalDevice, imageView);
+        }) | std::views::as_rvalue | 
         std::ranges::to<std::vector>();
     mainLogger.info("Created framebuffers");
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
@@ -332,8 +331,7 @@ std::vector<char> readFile(const std::string &filename) {
 
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent,
-    const std::shared_ptr<vki::RenderPass> &renderPass,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
     const vki::PipelineLayout &pipelineLayout) {
     auto vertShaderCode = readFile("../src/shaders/vertex.spv");
     auto fragmentShaderCode = readFile("../src/shaders/fragment.spv");
@@ -353,18 +351,19 @@ vki::GraphicsPipeline createGraphicsPipeline(
                                  vertexInputCreateInfo);
 };
 
-void drawFrame(
-    const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent,
-    const std::shared_ptr<vki::RenderPass> &renderPass,
-    const vki::GraphicsPipeline &pipeline,
-    const std::vector<std::shared_ptr<vki::Framebuffer>> &framebuffers,
-    const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
-    const vki::Semaphore &imageAvailableSemaphore,
-    const vki::Semaphore &renderFinishedSemaphore,
-    const std::shared_ptr<vki::Buffer> &vertexBuffer,
-    const vki::GraphicsQueueMixin &graphicsQueue,
-    const vki::PresentQueueMixin &presentQueue) {
+void drawFrame(const vki::LogicalDevice &logicalDevice,
+               const vki::Swapchain &swapchain,
+               const VkExtent2D &swapchainExtent,
+               const vki::RenderPass &renderPass,
+               const vki::GraphicsPipeline &pipeline,
+               const std::vector<vki::Framebuffer> &framebuffers,
+               const vki::CommandBuffer &commandBuffer,
+               const vki::Fence &inFlightFence,
+               const vki::Semaphore &imageAvailableSemaphore,
+               const vki::Semaphore &renderFinishedSemaphore,
+               const std::shared_ptr<vki::Buffer> &vertexBuffer,
+               const vki::GraphicsQueueMixin &graphicsQueue,
+               const vki::PresentQueueMixin &presentQueue) {
     inFlightFence.wait();
 
     uint32_t imageIndex =
@@ -387,10 +386,10 @@ void drawFrame(
     presentQueue.present(presentInfo);
 };
 
-void recordCommandBuffer(const std::shared_ptr<vki::Framebuffer> &framebuffer,
+void recordCommandBuffer(const vki::Framebuffer &framebuffer,
                          const vki::Swapchain &swapchain,
                          const VkExtent2D &swapchainExtent,
-                         const std::shared_ptr<vki::RenderPass> &renderPass,
+                         const vki::RenderPass &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
                          const std::shared_ptr<vki::Buffer> &vertexBuffer) {

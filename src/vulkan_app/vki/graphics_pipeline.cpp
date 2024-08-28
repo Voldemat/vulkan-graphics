@@ -2,7 +2,6 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <memory>
 
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
@@ -14,7 +13,7 @@ vki::GraphicsPipeline::GraphicsPipeline(
     const vki::ShaderModule &vertShader,
     const vki::ShaderModule &fragmentShader, VkExtent2D extent,
     const vki::PipelineLayout &pipelineLayout,
-    const std::shared_ptr<vki::RenderPass> &renderPass,
+    const vki::RenderPass &renderPass,
     const vki::LogicalDevice &logicalDevice,
     VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo)
     : device{ logicalDevice.getVkDevice() } {
@@ -108,7 +107,7 @@ vki::GraphicsPipeline::GraphicsPipeline(
     pipelineInfo.pMultisampleState = &multisample;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.layout = pipelineLayout.getVkPipelineLayout();
-    pipelineInfo.renderPass = renderPass->getVkRenderPass();
+    pipelineInfo.renderPass = renderPass.getVkRenderPass();
     pipelineInfo.subpass = 0;
 
     VkResult result =
