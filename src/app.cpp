@@ -10,7 +10,6 @@
 #include <format>
 #include <functional>
 #include <limits>
-#include <memory>
 #include <ranges>
 #include <set>
 #include <stdexcept>
@@ -97,7 +96,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const vki::Fence &inFlightFence,
                const vki::Semaphore &imageAvailableSemaphore,
                const vki::Semaphore &renderFinishedSemaphore,
-               const std::shared_ptr<vki::Buffer> &vertexBuffer,
+               const vki::Buffer &vertexBuffer,
                const vki::GraphicsQueueMixin &graphicsQueue,
                const vki::PresentQueueMixin &presentQueue);
 
@@ -107,7 +106,7 @@ void recordCommandBuffer(const vki::Framebuffer &framebuffer,
                          const vki::RenderPass &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
-                         const std::shared_ptr<vki::Buffer> &vertexBuffer);
+                         const vki::Buffer &vertexBuffer);
 
 vki::PresentMode choosePresentMode(
     const std::unordered_set<vki::PresentMode> &presentModes) {
@@ -363,37 +362,48 @@ void run_app() {
         swapchain.swapChainImageViews |
         std::views::transform([&swapchain, &swapchainExtent, &renderPass,
                                &logicalDevice](const auto &imageView) {
-            return vki::Framebuffer(swapchain, renderPass, swapchainExtent,
-                                    logicalDevice, imageView);
+            VkImageView attachments[] = { imageView };
+
+            VkFramebufferCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                .renderPass = renderPass.getVkRenderPass(),
+                .attachmentCount = 1,
+                .pAttachments = attachments,
+                .width = swapchainExtent.width,
+                .height = swapchainExtent.height,
+                .layers = 1,
+            };
+            return vki::Framebuffer(logicalDevice, createInfo);
         }) |
         std::ranges::to<std::vector>();
     mainLogger.info("Created framebuffers");
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    auto vertexBuffer =
-        std::make_shared<vki::Buffer>(logicalDevice, bufferInfo);
+    VkBufferCreateInfo vertexBufferCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = sizeof(vertices[0]) * vertices.size(),
+        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+    auto vertexBuffer = vki::Buffer(logicalDevice, vertexBufferCreateInfo);
     mainLogger.info("Created vertex buffer");
-    const auto &memoryRequirements = vertexBuffer->getMemoryRequirements();
+    const auto &memoryRequirements = vertexBuffer.getMemoryRequirements();
     const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &memoryTypeIndex = vki::utils::findMemoryType(
         memoryRequirements.memoryTypeBits, memoryProperties,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memoryRequirements.size;
-    allocInfo.memoryTypeIndex = memoryTypeIndex;
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memoryRequirements.size,
+        .memoryTypeIndex = memoryTypeIndex,
+    };
     const auto &vertexBufferMemory = vki::Memory(logicalDevice, allocInfo);
     mainLogger.info("Created vertex buffer memory");
-    vertexBuffer->bindMemory(vertexBufferMemory);
+    vertexBuffer.bindMemory(vertexBufferMemory);
     void *data;
-    vertexBufferMemory.mapMemory(bufferInfo.size, &data);
-    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+    vertexBufferMemory.mapMemory(vertexBufferCreateInfo.size, &data);
+    memcpy(data, vertices.data(), (size_t)vertexBufferCreateInfo.size);
     vertexBufferMemory.unmapMemory();
     mainLogger.info("Filled vertex buffer memory");
     const auto &commandBuffer = commandPool.createCommandBuffer();
@@ -467,7 +477,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const vki::Fence &inFlightFence,
                const vki::Semaphore &imageAvailableSemaphore,
                const vki::Semaphore &renderFinishedSemaphore,
-               const std::shared_ptr<vki::Buffer> &vertexBuffer,
+               const vki::Buffer &vertexBuffer,
                const vki::GraphicsQueueMixin &graphicsQueue,
                const vki::PresentQueueMixin &presentQueue) {
     inFlightFence.wait();
@@ -498,7 +508,7 @@ void recordCommandBuffer(const vki::Framebuffer &framebuffer,
                          const vki::RenderPass &renderPass,
                          const vki::GraphicsPipeline &pipeline,
                          const vki::CommandBuffer &commandBuffer,
-                         const std::shared_ptr<vki::Buffer> &vertexBuffer) {
+                         const vki::Buffer &vertexBuffer) {
     commandBuffer.begin();
 
     VkClearValue clearColor = { .color = {

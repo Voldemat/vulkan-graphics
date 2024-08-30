@@ -7,8 +7,9 @@
 
 vki::Semaphore::Semaphore(const vki::LogicalDevice &logicalDevice)
     : device{ logicalDevice.getVkDevice() } {
-    VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    VkSemaphoreCreateInfo semaphoreInfo = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
 
     VkResult result = vkCreateSemaphore(logicalDevice.getVkDevice(),
                                         &semaphoreInfo, nullptr, &vkSemaphore);

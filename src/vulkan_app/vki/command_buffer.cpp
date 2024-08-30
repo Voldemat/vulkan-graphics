@@ -2,7 +2,6 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <memory>
 #include <ranges>
 #include <vector>
 
@@ -12,11 +11,12 @@
 
 vki::CommandBuffer::CommandBuffer(const VkCommandPool &commandPool,
                                   const VkDevice &logicalDevice) {
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+    VkCommandBufferAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = commandPool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
 
     VkResult result =
         vkAllocateCommandBuffers(logicalDevice, &allocInfo, &vkCommandBuffer);
@@ -73,9 +73,8 @@ void vki::CommandBuffer::draw(const vki::DrawArgs &args) const {
 void vki::CommandBuffer::bindVertexBuffers(
     const BindVertexBuffersArgs &args) const {
     std::vector<VkBuffer> vertexBuffers =
-        args.buffers |
-        std::views::transform([](const std::shared_ptr<vki::Buffer> &buffer) {
-            return buffer->getVkBuffer();
+        args.buffers | std::views::transform([](const vki::Buffer &buffer) {
+            return buffer.getVkBuffer();
         }) |
         std::ranges::to<std::vector>();
     VkDeviceSize offsets[] = { 0 };

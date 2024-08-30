@@ -2,7 +2,6 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <memory>
 #include <vector>
 
 #include "vulkan_app/vki/buffer.hpp"
@@ -47,7 +46,7 @@ struct DrawArgs {
 struct BindVertexBuffersArgs {
     unsigned int firstBinding;
     unsigned int bindingCount;
-    std::vector<std::shared_ptr<vki::Buffer>> buffers;
+    std::vector<vki::Buffer> buffers;
     std::vector<VkDeviceSize> offsets;
 };
 

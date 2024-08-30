@@ -6,9 +6,19 @@
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/memory.hpp"
 
+vki::Buffer::Buffer(const vki::Buffer &other)
+    : device{ other.device }, vkBuffer{ other.vkBuffer }, is_owner{ false } {};
+
+vki::Buffer::Buffer(vki::Buffer &&other)
+    : device{ other.device },
+      vkBuffer{ other.vkBuffer },
+      is_owner{ other.is_owner } {
+    other.is_owner = false;
+};
+
 vki::Buffer::Buffer(const vki::LogicalDevice &logicalDevice,
                     VkBufferCreateInfo createInfo)
-    : device{ logicalDevice.getVkDevice() } {
+    : device{ logicalDevice.getVkDevice() }, is_owner{ true } {
     VkResult result = vkCreateBuffer(device, &createInfo, nullptr, &vkBuffer);
     vki::assertSuccess(result, "vkCreateBuffer");
 };
@@ -26,4 +36,8 @@ void vki::Buffer::bindMemory(const vki::Memory &newMemory) {
     vkBindBufferMemory(device, vkBuffer, newMemory.getVkMemory(), 0);
 };
 
-vki::Buffer::~Buffer() { vkDestroyBuffer(device, vkBuffer, nullptr); };
+vki::Buffer::~Buffer() {
+    if (is_owner) {
+        vkDestroyBuffer(device, vkBuffer, nullptr);
+    };
+};

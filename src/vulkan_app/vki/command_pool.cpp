@@ -6,11 +6,11 @@
 #include "vulkan_app/vki/command_buffer.hpp"
 
 void vki::CommandPool::init(const unsigned int &queueFamilyIndex) {
-    VkCommandPoolCreateInfo commandPoolCreateInfo{};
-    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    commandPoolCreateInfo.flags =
-        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
+    VkCommandPoolCreateInfo commandPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = queueFamilyIndex,
+    };
     VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo,
                                           nullptr, &vkCommandPool);
     vki::assertSuccess(result, "vkCreateCommandPool");

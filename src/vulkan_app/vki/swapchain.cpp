@@ -57,7 +57,7 @@ VkSwapchainCreateInfoKHR vki::SwapchainCreateInfo::toVkCreateInfo() const {
                             .value_or(VK_NULL_HANDLE),
     };
     if (sharingInfo.queueIndices.has_value()) {
-        const auto& queueIndices = sharingInfo.queueIndices.value();
+        const auto &queueIndices = sharingInfo.queueIndices.value();
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = queueIndices.size();
         createInfo.pQueueFamilyIndices = queueIndices.data();
@@ -90,20 +90,25 @@ void vki::Swapchain::createImageViews(const vki::LogicalDevice &logicalDevice,
     swapChainImageViews.resize(swapChainImages.size());
     int index = 0;
     for (const auto &image : swapChainImages) {
-        VkImageViewCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = image;
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = format;
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
+        VkImageViewCreateInfo createInfo = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .image = image,
+            .viewType = VK_IMAGE_VIEW_TYPE_2D,
+            .format = format,
+            .components = {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
         VkResult result =
             vkCreateImageView(logicalDevice.getVkDevice(), &createInfo, nullptr,
                               &swapChainImageViews[index]);

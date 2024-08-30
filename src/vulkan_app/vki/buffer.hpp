@@ -11,9 +11,12 @@ class Buffer {
     VkBuffer vkBuffer;
     VkDevice device;
     std::optional<vki::Memory> memory;
-
+protected:
+    bool is_owner;
 public:
-    Buffer(const Buffer &other) = delete;
+    Buffer(const Buffer &&other) = delete;
+    Buffer(Buffer &&other);
+    Buffer(const Buffer &other);
     explicit Buffer(const vki::LogicalDevice &logicalDevice,
                     VkBufferCreateInfo createInfo);
     VkBuffer getVkBuffer() const;
