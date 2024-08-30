@@ -8,10 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
-#include <fstream>
 #include <functional>
-#include <ios>
-#include <iostream>
 #include <limits>
 #include <memory>
 #include <ranges>
@@ -25,6 +22,7 @@
 #include "./glfw_controller.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "shaders.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
@@ -55,11 +53,6 @@ vki::PhysicalDevice pickPhysicalDevice(const vki::VulkanInstance &instance,
 vki::QueueFamilyWithOp<1, vki::QueueOperationType::GRAPHIC,
                        vki::QueueOperationType::PRESENT>
 pickQueueFamily(const std::vector<vki::QueueFamily> &families);
-
-vki::GraphicsPipeline createGraphicsPipeline(
-    const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::PipelineLayout &pipelineLayout);
 
 struct Vertex {
     glm::vec2 pos;
@@ -151,6 +144,123 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
 uint32_t getImageCount(const VkSurfaceCapabilitiesKHR &capabilities) {
     return std::clamp(capabilities.minImageCount + 1,
                       capabilities.minImageCount, capabilities.maxImageCount);
+};
+
+vki::GraphicsPipeline createGraphicsPipeline(
+    const vki::LogicalDevice &logicalDevice, el::Logger &logger,
+    VkExtent2D swapchainExtent, const vki::RenderPass &renderPass) {
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+    };
+    const auto pipelineLayout =
+        vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
+    logger.info("Created pipeline layout");
+
+    auto vertShader = vki::ShaderModule(logicalDevice, vertShaderCode);
+    auto fragmentShader = vki::ShaderModule(logicalDevice, fragShaderCode);
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+    VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &bindingDescription,
+        .vertexAttributeDescriptionCount = attributeDescriptions.size(),
+        .pVertexAttributeDescriptions = attributeDescriptions.data()
+    };
+
+    VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .module = vertShader.getVkShaderModule(),
+        .pName = "main",
+    };
+
+    VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .module = fragmentShader.getVkShaderModule(),
+        .pName = "main",
+    };
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+        vertexShaderCreateInfo, fragmentShaderCreateInfo
+    };
+
+    VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .primitiveRestartEnable = VK_FALSE,
+    };
+
+    VkViewport viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = static_cast<float>(swapchainExtent.width),
+        .height = static_cast<float>(swapchainExtent.height),
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+
+    VkRect2D scissor = { .offset = { .x = 100, .y = 100 },
+                         .extent = swapchainExtent };
+    VkPipelineViewportStateCreateInfo viewportCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .pViewports = &viewport,
+        .scissorCount = 1,
+        .pScissors = &scissor,
+    };
+
+    VkPipelineRasterizationStateCreateInfo rasterizer = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = VK_POLYGON_MODE_FILL,
+        .cullMode = VK_CULL_MODE_BACK_BIT,
+        .frontFace = VK_FRONT_FACE_CLOCKWISE,
+        .depthBiasEnable = VK_FALSE,
+        .lineWidth = 1.0f,
+    };
+
+    VkPipelineMultisampleStateCreateInfo multisample = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        .sampleShadingEnable = VK_FALSE,
+        .minSampleShading = 1.0f,
+        .pSampleMask = nullptr,
+        .alphaToCoverageEnable = VK_FALSE,
+        .alphaToOneEnable = VK_FALSE,
+    };
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+        .blendEnable = VK_FALSE,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+
+    };
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .logicOpEnable = VK_FALSE,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment,
+    };
+
+    VkGraphicsPipelineCreateInfo pipelineInfo = {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .stageCount = 2,
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputCreateInfo,
+        .pInputAssemblyState = &pipelineInputAssemblyCreateInfo,
+        .pViewportState = &viewportCreateInfo,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisample,
+        .pColorBlendState = &colorBlending,
+        .layout = pipelineLayout.getVkPipelineLayout(),
+        .renderPass = renderPass.getVkRenderPass(),
+        .subpass = 0,
+    };
+    return vki::GraphicsPipeline(logicalDevice, pipelineInfo);
 };
 
 void run_app() {
@@ -246,15 +356,8 @@ void run_app() {
         vki::RenderPass(logicalDevice, renderPassCreateInfo);
     mainLogger.info("Created render pass");
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
-    };
-    const auto pipelineLayout =
-        vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
-    mainLogger.info("Created pipeline layout");
-
-    const auto pipeline = createGraphicsPipeline(
-        logicalDevice, swapchain, swapchainExtent, renderPass, pipelineLayout);
+    const auto &pipeline = createGraphicsPipeline(logicalDevice, mainLogger,
+                                                  swapchainExtent, renderPass);
     mainLogger.info("Created pipeline");
     const auto &framebuffers =
         swapchain.swapChainImageViews |
@@ -263,7 +366,7 @@ void run_app() {
             return vki::Framebuffer(swapchain, renderPass, swapchainExtent,
                                     logicalDevice, imageView);
         }) |
-        std::views::as_rvalue | std::ranges::to<std::vector>();
+        std::ranges::to<std::vector>();
     mainLogger.info("Created framebuffers");
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
@@ -352,41 +455,6 @@ pickQueueFamily(const std::vector<vki::QueueFamily> &families) {
     return &*std::ranges::find_if(families, [](const auto &family) -> bool {
         return queueFamilyFilter(family);
     });
-};
-
-std::vector<char> readFile(const std::string &filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file: " + filename);
-    };
-    size_t fileSize = (size_t)file.tellg();
-    std::vector<char> buffer(fileSize);
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-    return buffer;
-};
-
-vki::GraphicsPipeline createGraphicsPipeline(
-    const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::PipelineLayout &pipelineLayout) {
-    std::vector<char> vertShaderCode(&data_start_shader_vert_spv, &data_end_shader_vert_spv);
-    std::vector<char> fragShaderCode(&data_start_shader_frag_spv, &data_end_shader_frag_spv);
-    auto vertShader = vki::ShaderModule(logicalDevice, vertShaderCode);
-    auto fragmentShader = vki::ShaderModule(logicalDevice, fragShaderCode);
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescriptions = Vertex::getAttributeDescriptions();
-    VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &bindingDescription,
-        .vertexAttributeDescriptionCount = attributeDescriptions.size(),
-        .pVertexAttributeDescriptions = attributeDescriptions.data()
-    };
-    return vki::GraphicsPipeline(vertShader, fragmentShader, swapchainExtent,
-                                 pipelineLayout, renderPass, logicalDevice,
-                                 vertexInputCreateInfo);
 };
 
 void drawFrame(const vki::LogicalDevice &logicalDevice,

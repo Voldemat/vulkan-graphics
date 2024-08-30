@@ -14,12 +14,8 @@ class GraphicsPipeline {
 
 public:
     explicit GraphicsPipeline(
-        const vki::ShaderModule &vertShader,
-        const vki::ShaderModule &fragmentShader, VkExtent2D extent,
-        const vki::PipelineLayout &pipelineLayout,
-        const vki::RenderPass &renderPass,
         const vki::LogicalDevice &logicalDevice,
-        VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo);
+        const VkGraphicsPipelineCreateInfo& createInfo);
     VkPipeline getVkPipeline() const;
     ~GraphicsPipeline();
 };
