@@ -210,22 +210,60 @@ void run_app() {
           .sharingInfo = vki::SwapchainSharingInfo(queueFamily.family,
                                                    queueFamily.family) });
     mainLogger.info("Created swapchain");
+
+    VkAttachmentDescription colorAttachment = {
+        .format = swapchainFormat.format,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+    };
+    VkAttachmentReference colorAttachmentRef = {
+        .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+    };
+    VkSubpassDescription subpass = {
+        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colorAttachmentRef,
+    };
+    VkSubpassDependency dependency = {
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+    };
+    const vki::RenderPassCreateInfo renderPassCreateInfo = {
+        .attachments = { colorAttachment },
+        .subpasses = { subpass },
+        .dependencies = { dependency },
+    };
     const auto renderPass =
-        vki::RenderPass(swapchainFormat.format, logicalDevice);
+        vki::RenderPass(logicalDevice, renderPassCreateInfo);
     mainLogger.info("Created render pass");
-    const auto pipelineLayout = vki::PipelineLayout(logicalDevice);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+    };
+    const auto pipelineLayout =
+        vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
     mainLogger.info("Created pipeline layout");
+
     const auto pipeline = createGraphicsPipeline(
         logicalDevice, swapchain, swapchainExtent, renderPass, pipelineLayout);
     mainLogger.info("Created pipeline");
-    const auto& framebuffers =
+    const auto &framebuffers =
         swapchain.swapChainImageViews |
         std::views::transform([&swapchain, &swapchainExtent, &renderPass,
                                &logicalDevice](const auto &imageView) {
             return vki::Framebuffer(swapchain, renderPass, swapchainExtent,
                                     logicalDevice, imageView);
-        }) | std::views::as_rvalue | 
-        std::ranges::to<std::vector>();
+        }) |
+        std::views::as_rvalue | std::ranges::to<std::vector>();
     mainLogger.info("Created framebuffers");
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
@@ -333,10 +371,10 @@ vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
     const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
     const vki::PipelineLayout &pipelineLayout) {
-    auto vertShaderCode = readFile("../src/shaders/vertex.spv");
-    auto fragmentShaderCode = readFile("../src/shaders/fragment.spv");
+    std::vector<char> vertShaderCode(&data_start_shader_vert_spv, &data_end_shader_vert_spv);
+    std::vector<char> fragShaderCode(&data_start_shader_frag_spv, &data_end_shader_frag_spv);
     auto vertShader = vki::ShaderModule(logicalDevice, vertShaderCode);
-    auto fragmentShader = vki::ShaderModule(logicalDevice, fragmentShaderCode);
+    auto fragmentShader = vki::ShaderModule(logicalDevice, fragShaderCode);
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {

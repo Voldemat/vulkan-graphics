@@ -15,14 +15,18 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/easyloggingpp.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/magic_enum.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeUtils.cmake")
 file(GLOB_RECURSE GRAPHICS_HEADERS src/*.hpp src/*.h)
 file(GLOB_RECURSE GRAPHICS_SOURCES src/*.cpp src/*.c)
+file(GLOB_RECURSE GLSL_SHADERS src/shaders/*.frag src/shaders/*.vert)
+add_shaders(glsl-shaders ${GLSL_SHADERS})
+set(GLSL_COMPILED_SHADERS ${add_shaders_RETURN})
+prepare_shaders(glsl-shaders-object-files ${GLSL_COMPILED_SHADERS})
 add_executable(
     main
     ${GRAPHICS_HEADERS}
     ${GRAPHICS_SOURCES}
 )
-cmake_print_variables(Vulkan_INCLUDE_DIRS)
 target_include_directories(
     main
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
@@ -31,4 +35,8 @@ target_include_directories(
     PRIVATE ${EASYLOGGINGPP_INCLUDE_DIRECTORIES}
     PRIVATE ${Vulkan_INCLUDE_DIRS}
 )
-target_link_libraries(main glfw Vulkan::Vulkan glm easyloggingpp magic_enum::magic_enum)
+target_link_libraries(
+    main
+    glfw Vulkan::Vulkan glm easyloggingpp magic_enum::magic_enum
+    ${prepare_shaders_RETURN}
+)

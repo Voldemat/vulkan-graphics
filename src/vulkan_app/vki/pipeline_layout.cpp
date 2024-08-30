@@ -5,14 +5,12 @@
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 
-vki::PipelineLayout::PipelineLayout(const vki::LogicalDevice &logicalDevice)
+vki::PipelineLayout::PipelineLayout(
+    const vki::LogicalDevice &logicalDevice,
+    const VkPipelineLayoutCreateInfo &createInfo)
     : device{ logicalDevice.getVkDevice() } {
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
-    };
-    VkResult result = vkCreatePipelineLayout(logicalDevice.getVkDevice(),
-                                             &pipelineLayoutCreateInfo, nullptr,
-                                             &vkPipelineLayout);
+    VkResult result = vkCreatePipelineLayout(
+        logicalDevice.getVkDevice(), &createInfo, nullptr, &vkPipelineLayout);
     vki::assertSuccess(result, "vkCreatePipelineLayout");
 };
 

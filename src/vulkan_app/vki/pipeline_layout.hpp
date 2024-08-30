@@ -10,7 +10,8 @@ class PipelineLayout {
 
 public:
     VkPipelineLayout getVkPipelineLayout() const;
-    explicit PipelineLayout(const vki::LogicalDevice &logicalDevice);
+    explicit PipelineLayout(const vki::LogicalDevice &logicalDevice,
+                            const VkPipelineLayoutCreateInfo &createInfo);
     ~PipelineLayout();
 };
 };  // namespace vki
