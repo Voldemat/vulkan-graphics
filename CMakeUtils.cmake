@@ -29,12 +29,15 @@ function(add_shaders TARGET_NAME)
 endfunction()
 
 function(generate_shader_assembly INPUT_FILE_BASE INPUT_FILE_NAME)
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        set(SEGMENT_PREFIX "_")
+    endif()
     set(generate_shader_assembly_RETURN "\
-    \t.global _data_start_${INPUT_FILE_BASE}\n\
-    \t.global _data_end_${INPUT_FILE_BASE}\n\
-    _data_start_${INPUT_FILE_BASE}:\n\
+    \t.global ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}\n\
+    \t.global ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}\n\
+    ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}:\n\
     \t.incbin \"${INPUT_FILE_NAME}\"\n\
-    _data_end_${INPUT_FILE_BASE}:\n\
+    ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}:\n\
     " PARENT_SCOPE)
 endfunction()
 function(prepare_shaders TARGET_NAME)
