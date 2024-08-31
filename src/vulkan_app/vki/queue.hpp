@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "./fence.hpp"
-#include "vulkan_app/vki/physical_device.hpp"
+#include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/structs.hpp"
 
 namespace vki {
@@ -17,6 +17,7 @@ class EmptyQueueMixin {};
 class BaseQueue {
 public:
     virtual const VkQueue getVkQueue() const = 0;
+    virtual void waitIdle() const = 0;
 };
 
 class GraphicsQueueMixin : public BaseQueue {
@@ -52,5 +53,8 @@ public:
     explicit Queue(const VkQueue &queue, const unsigned int &queueFamilyIndex)
         : queue{ queue }, queueFamilyIndex{ queueFamilyIndex } {};
     inline const VkQueue getVkQueue() const { return queue; };
+    void waitIdle() const {
+        vkQueueWaitIdle(queue);
+    };
 };
 };  // namespace vki

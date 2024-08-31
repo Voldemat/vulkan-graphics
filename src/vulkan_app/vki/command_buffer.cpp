@@ -91,3 +91,11 @@ VkRenderPassBeginInfo vki::RenderPassBeginInfo::toVkBeginInfo() const {
              .clearValueCount = static_cast<unsigned int>(clearValues.size()),
              .pClearValues = clearValues.data() };
 };
+
+void vki::CommandBuffer::copyBuffer(
+    const vki::Buffer &srcBuffer, const vki::Buffer dstBuffer,
+    const std::vector<VkBufferCopy> &copyRegions) const {
+    vkCmdCopyBuffer(vkCommandBuffer, srcBuffer.getVkBuffer(),
+                    dstBuffer.getVkBuffer(), copyRegions.size(),
+                    copyRegions.data());
+};

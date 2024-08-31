@@ -10,6 +10,7 @@
 #include <format>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <ranges>
 #include <set>
 #include <stdexcept>
@@ -83,7 +84,7 @@ struct Vertex {
 const std::vector<Vertex> vertices = {
     { .pos = { 0.0f, -0.5f }, .color = { 1.0f, 0.0f, 0.0f } },
     { .pos = { 0.5f, 0.5f }, .color = { 1.0f, 1.0f, 0.0f } },
-    { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f } }
+    { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f } },
 };
 
 void drawFrame(const vki::LogicalDevice &logicalDevice,
@@ -262,6 +263,84 @@ vki::GraphicsPipeline createGraphicsPipeline(
     return vki::GraphicsPipeline(logicalDevice, pipelineInfo);
 };
 
+vki::Buffer createStagingBuffer(const vki::LogicalDevice &logicalDevice,
+                                const vki::PhysicalDevice &physicalDevice,
+                                el::Logger &logger) {
+    VkBufferCreateInfo stagingBufferCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = sizeof(vertices[0]) * vertices.size(),
+        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+    auto stagingBuffer = vki::Buffer(logicalDevice, stagingBufferCreateInfo);
+    logger.info("Created vertex buffer");
+    const auto &memoryProperties = physicalDevice.getMemoryProperties();
+    const auto &stagingBufferMemoryRequirements =
+        stagingBuffer.getMemoryRequirements();
+    const auto &stagingBufferMemoryTypeIndex = vki::utils::findMemoryType(
+        stagingBufferMemoryRequirements.memoryTypeBits, memoryProperties,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = stagingBufferMemoryRequirements.size,
+        .memoryTypeIndex = stagingBufferMemoryTypeIndex,
+    };
+    auto stagingBufferMemory = vki::Memory(logicalDevice, allocInfo);
+    logger.info("Created vertex buffer memory");
+    stagingBuffer.bindMemoryAndTakeOwnership(stagingBufferMemory);
+    stagingBufferMemory.write(allocInfo.allocationSize,
+                              (void *)vertices.data());
+    logger.info("Filled vertex buffer memory");
+    return stagingBuffer;
+};
+
+vki::Buffer createVertexBuffer(const vki::LogicalDevice &logicalDevice,
+                               const vki::PhysicalDevice &physicalDevice,
+                               el::Logger &logger,
+                               const vki::CommandPool &commandPool,
+                               const vki::GraphicsQueueMixin &graphicsQueue) {
+    const auto &stagingBuffer =
+        createStagingBuffer(logicalDevice, physicalDevice, logger);
+    VkBufferCreateInfo vertexBufferCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = sizeof(vertices[0]) * vertices.size(),
+        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+    auto vertexBuffer = vki::Buffer(logicalDevice, vertexBufferCreateInfo);
+    logger.info("Created vertex buffer");
+    const auto &memoryProperties = physicalDevice.getMemoryProperties();
+    const auto &vertexBufferMemoryRequirements =
+        vertexBuffer.getMemoryRequirements();
+    const auto &vertexBufferMemoryTypeIndex = vki::utils::findMemoryType(
+        vertexBufferMemoryRequirements.memoryTypeBits, memoryProperties,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = vertexBufferMemoryRequirements.size,
+        .memoryTypeIndex = vertexBufferMemoryTypeIndex,
+    };
+    auto vertexBufferMemory = vki::Memory(logicalDevice, allocInfo);
+    logger.info("Created vertex buffer memory");
+    vertexBuffer.bindMemoryAndTakeOwnership(vertexBufferMemory);
+    const auto &commandBuffer = commandPool.createCommandBuffer();
+    commandBuffer.begin();
+    commandBuffer.copyBuffer(stagingBuffer, vertexBuffer,
+                             { (VkBufferCopy){
+                                 .srcOffset = 0,
+                                 .dstOffset = 0,
+                                 .size = allocInfo.allocationSize,
+                             } });
+    commandBuffer.end();
+    graphicsQueue.submit({ vki::SubmitInfo((vki::SubmitInfoInputData){
+                             .commandBuffers = { &commandBuffer } }) },
+                         std::nullopt);
+    graphicsQueue.waitIdle();
+    return vertexBuffer;
+};
+
 void run_app() {
     auto &mainLogger = *el::Loggers::getLogger("main");
     mainLogger.info("Creating GLFWController...");
@@ -379,33 +458,8 @@ void run_app() {
     mainLogger.info("Created framebuffers");
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
-    VkBufferCreateInfo vertexBufferCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = sizeof(vertices[0]) * vertices.size(),
-        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    };
-    auto vertexBuffer = vki::Buffer(logicalDevice, vertexBufferCreateInfo);
-    mainLogger.info("Created vertex buffer");
-    const auto &memoryRequirements = vertexBuffer.getMemoryRequirements();
-    const auto &memoryProperties = physicalDevice.getMemoryProperties();
-    const auto &memoryTypeIndex = vki::utils::findMemoryType(
-        memoryRequirements.memoryTypeBits, memoryProperties,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = memoryRequirements.size,
-        .memoryTypeIndex = memoryTypeIndex,
-    };
-    const auto &vertexBufferMemory = vki::Memory(logicalDevice, allocInfo);
-    mainLogger.info("Created vertex buffer memory");
-    vertexBuffer.bindMemory(vertexBufferMemory);
-    void *data;
-    vertexBufferMemory.mapMemory(vertexBufferCreateInfo.size, &data);
-    memcpy(data, vertices.data(), (size_t)vertexBufferCreateInfo.size);
-    vertexBufferMemory.unmapMemory();
-    mainLogger.info("Filled vertex buffer memory");
+    const auto &vertexBuffer = createVertexBuffer(
+        logicalDevice, physicalDevice, mainLogger, commandPool, queue);
     const auto &commandBuffer = commandPool.createCommandBuffer();
     mainLogger.info("Created command buffer");
     const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);

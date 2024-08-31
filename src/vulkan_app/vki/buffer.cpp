@@ -31,7 +31,7 @@ VkMemoryRequirements vki::Buffer::getMemoryRequirements() const {
     return memRequirements;
 };
 
-void vki::Buffer::bindMemory(const vki::Memory &newMemory) {
+void vki::Buffer::bindMemoryAndTakeOwnership(vki::Memory &newMemory) {
     memory = newMemory;
     vkBindBufferMemory(device, vkBuffer, newMemory.getVkMemory(), 0);
 };

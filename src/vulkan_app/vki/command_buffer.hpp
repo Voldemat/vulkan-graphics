@@ -62,6 +62,8 @@ public:
     void reset() const;
     void begin(const CommandBufferUsage &usage =
                    CommandBufferUsage::ONE_TIME_SUBMIT) const;
+    void copyBuffer(const vki::Buffer &srcBuffer, const vki::Buffer dstBuffer,
+                    const std::vector<VkBufferCopy> &copyRegions) const;
     void end() const;
     void beginRenderPass(
         const vki::RenderPassBeginInfo &renderPassBeginInfo,
