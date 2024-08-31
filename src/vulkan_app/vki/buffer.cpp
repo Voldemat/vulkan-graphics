@@ -2,17 +2,22 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <optional>
+#include <utility>
+
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/memory.hpp"
 
 vki::Buffer::Buffer(const vki::Buffer &other)
-    : device{ other.device }, vkBuffer{ other.vkBuffer }, is_owner{ false } {};
+    : device{ other.device }, vkBuffer{ other.vkBuffer }, is_owner{ false } {
+};
 
 vki::Buffer::Buffer(vki::Buffer &&other)
     : device{ other.device },
       vkBuffer{ other.vkBuffer },
-      is_owner{ other.is_owner } {
+      is_owner{ other.is_owner },
+      memory{ std::move(other.memory) } {
     other.is_owner = false;
 };
 
@@ -31,8 +36,8 @@ VkMemoryRequirements vki::Buffer::getMemoryRequirements() const {
     return memRequirements;
 };
 
-void vki::Buffer::bindMemoryAndTakeOwnership(vki::Memory &newMemory) {
-    memory = newMemory;
+void vki::Buffer::bindMemory(vki::Memory &&newMemory) {
+    memory.emplace(newMemory);
     vkBindBufferMemory(device, vkBuffer, newMemory.getVkMemory(), 0);
 };
 

@@ -70,6 +70,11 @@ void vki::CommandBuffer::draw(const vki::DrawArgs &args) const {
               args.firstVertex, args.firstInstance);
 };
 
+void vki::CommandBuffer::drawIndexed(const vki::DrawIndexedArgs &args) const {
+    vkCmdDrawIndexed(vkCommandBuffer, args.indexCount, args.instanceCount,
+                     args.firstIndex, args.vertexOffset, args.firstInstance);
+};
+
 void vki::CommandBuffer::bindVertexBuffers(
     const BindVertexBuffersArgs &args) const {
     std::vector<VkBuffer> vertexBuffers =
@@ -83,6 +88,11 @@ void vki::CommandBuffer::bindVertexBuffers(
                            args.offsets.data());
 };
 
+void vki::CommandBuffer::bindIndexBuffer(
+    const BindIndexBufferArgs &args) const {
+    vkCmdBindIndexBuffer(vkCommandBuffer, args.buffer.getVkBuffer(),
+                         args.offset, args.type);
+};
 VkRenderPassBeginInfo vki::RenderPassBeginInfo::toVkBeginInfo() const {
     return { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
              .renderPass = renderPass.getVkRenderPass(),

@@ -43,11 +43,26 @@ struct DrawArgs {
     unsigned int firstInstance = 0;
 };
 
+
+struct DrawIndexedArgs {
+    unsigned int indexCount;
+    unsigned int instanceCount;
+    unsigned int firstIndex;
+    int vertexOffset;
+    unsigned int firstInstance;
+};
+
 struct BindVertexBuffersArgs {
     unsigned int firstBinding;
     unsigned int bindingCount;
     std::vector<vki::Buffer> buffers;
     std::vector<VkDeviceSize> offsets;
+};
+
+struct BindIndexBufferArgs {
+    vki::Buffer buffer;
+    VkDeviceSize offset;
+    VkIndexType type;
 };
 
 class CommandBuffer {
@@ -72,7 +87,9 @@ public:
         const vki::GraphicsPipeline &pipeline,
         const vki::PipelineBindPointType &pipelineBindPointType) const;
     void endRenderPass() const;
-    void draw(const DrawArgs &args) const;
-    void bindVertexBuffers(const BindVertexBuffersArgs &args) const;
+    void draw(const vki::DrawArgs &args) const;
+    void drawIndexed(const vki::DrawIndexedArgs &args) const;
+    void bindVertexBuffers(const vki::BindVertexBuffersArgs &args) const;
+    void bindIndexBuffer(const vki::BindIndexBufferArgs &args) const;
 };
 };  // namespace vki

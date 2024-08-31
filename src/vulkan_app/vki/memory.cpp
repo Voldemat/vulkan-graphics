@@ -8,11 +8,12 @@
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 
-vki::Memory::Memory(const vki::Memory &other)
+vki::Memory::Memory(vki::Memory &other)
     : vki::Borrowable(other),
       device{ other.device },
       vkMemory{ other.vkMemory } {};
-vki::Memory::Memory(vki::Memory &other)
+
+vki::Memory::Memory(vki::Memory &&other)
     : vki::Borrowable(other),
       device{ other.device },
       vkMemory{ other.vkMemory } {};

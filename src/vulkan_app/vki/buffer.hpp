@@ -20,7 +20,7 @@ public:
     explicit Buffer(const vki::LogicalDevice &logicalDevice,
                     VkBufferCreateInfo createInfo);
     VkBuffer getVkBuffer() const;
-    void bindMemoryAndTakeOwnership(vki::Memory &memory);
+    void bindMemory(vki::Memory &&memory);
     VkMemoryRequirements getMemoryRequirements() const;
     ~Buffer();
 };

@@ -12,13 +12,16 @@ protected:
     Borrowable(Borrowable& other): is_owner{other.is_owner} {
         other.is_owner = false;
     };
+    Borrowable(Borrowable&& other): is_owner{other.is_owner} {
+        other.is_owner = false;
+    };
 };
 
 class Memory : Borrowable {
     VkDeviceMemory vkMemory;
     VkDevice device;
 public:
-    Memory(const vki::Memory& other);
+    Memory(vki::Memory&& other);
     Memory(vki::Memory& other);
     explicit Memory(const vki::LogicalDevice &device,
                     VkMemoryAllocateInfo allocInfo);
