@@ -4,11 +4,13 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <format>
 #include <functional>
+#include <iostream>
 #include <limits>
 #include <optional>
 #include <ranges>
@@ -21,12 +23,18 @@
 #include <vector>
 
 #include "./glfw_controller.hpp"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "glm/trigonometric.hpp"
 #include "shaders.hpp"
+#include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
+#include "vulkan_app/vki/descriptor_set_layout.hpp"
 #include "vulkan_app/vki/fence.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
@@ -46,6 +54,12 @@
 #include "vulkan_app/vki/physical_device.hpp"
 #include "vulkan_app/vki/structs.hpp"
 #include "vulkan_app/vki/surface.hpp"
+
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
 
 vki::PhysicalDevice pickPhysicalDevice(const vki::VulkanInstance &instance,
                                        const vki::Surface &surface,
@@ -103,16 +117,19 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const vki::Semaphore &renderFinishedSemaphore,
                const vki::Buffer &vertexBuffer, const vki::Buffer &indexBuffer,
                const vki::GraphicsQueueMixin &graphicsQueue,
-               const vki::PresentQueueMixin &presentQueue);
+               const vki::PresentQueueMixin &presentQueue,
+               const std::vector<void *> &uniformMapped,
+               const vki::PipelineLayout &pipelineLayout,
+               const std::vector<VkDescriptorSet> &descriptorSets);
 
-void recordCommandBuffer(const vki::Framebuffer &framebuffer,
-                         const vki::Swapchain &swapchain,
-                         const VkExtent2D &swapchainExtent,
-                         const vki::RenderPass &renderPass,
-                         const vki::GraphicsPipeline &pipeline,
-                         const vki::CommandBuffer &commandBuffer,
-                         const vki::Buffer &vertexBuffer,
-                         const vki::Buffer &indexBuffer);
+void recordCommandBuffer(
+    const vki::Framebuffer &framebuffer, const vki::Swapchain &swapchain,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
+    const vki::GraphicsPipeline &pipeline,
+    const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
+    const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
+    const std::vector<VkDescriptorSet> &descriptorSets,
+    const unsigned int imageIndex);
 
 vki::PresentMode choosePresentMode(
     const std::unordered_set<vki::PresentMode> &presentModes) {
@@ -153,14 +170,8 @@ uint32_t getImageCount(const VkSurfaceCapabilitiesKHR &capabilities) {
 
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, el::Logger &logger,
-    VkExtent2D swapchainExtent, const vki::RenderPass &renderPass) {
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
-    };
-    const auto pipelineLayout =
-        vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
-    logger.info("Created pipeline layout");
-
+    VkExtent2D swapchainExtent, const vki::RenderPass &renderPass,
+    const vki::PipelineLayout &pipelineLayout) {
     auto vertShader = vki::ShaderModule(logicalDevice, vertShaderCode);
     auto fragmentShader = vki::ShaderModule(logicalDevice, fragShaderCode);
     auto bindingDescription = Vertex::getBindingDescription();
@@ -222,7 +233,7 @@ vki::GraphicsPipeline createGraphicsPipeline(
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = VK_POLYGON_MODE_FILL,
         .cullMode = VK_CULL_MODE_BACK_BIT,
-        .frontFace = VK_FRONT_FACE_CLOCKWISE,
+        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .depthBiasEnable = VK_FALSE,
         .lineWidth = 1.0f,
     };
@@ -268,10 +279,10 @@ vki::GraphicsPipeline createGraphicsPipeline(
     return vki::GraphicsPipeline(logicalDevice, pipelineInfo);
 };
 
-vki::Buffer createStagingBuffer(const vki::LogicalDevice &logicalDevice,
-                                const vki::PhysicalDevice &physicalDevice,
-                                el::Logger &logger, const std::size_t &size,
-                                void *data) {
+vki::Buffer createStagingBuffer(
+    const vki::LogicalDevice &logicalDevice,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const std::size_t &size, void *data) {
     VkBufferCreateInfo stagingBufferCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .size = size,
@@ -281,7 +292,6 @@ vki::Buffer createStagingBuffer(const vki::LogicalDevice &logicalDevice,
     auto stagingBuffer = vki::Buffer(logicalDevice, stagingBufferCreateInfo);
     logger.info(std::format("Created staging buffer: {}",
                             (void *)stagingBuffer.getVkBuffer()));
-    const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &stagingBufferMemoryRequirements =
         stagingBuffer.getMemoryRequirements();
     const auto &stagingBufferMemoryTypeIndex = vki::utils::findMemoryType(
@@ -303,12 +313,12 @@ vki::Buffer createStagingBuffer(const vki::LogicalDevice &logicalDevice,
     return stagingBuffer;
 };
 
-vki::Buffer createVertexBuffer(const vki::LogicalDevice &logicalDevice,
-                               const vki::PhysicalDevice &physicalDevice,
-                               el::Logger &logger,
-                               const vki::Buffer &stagingBuffer,
-                               const vki::CommandBuffer &commandBuffer,
-                               const vki::GraphicsQueueMixin &graphicsQueue) {
+vki::Buffer createVertexBuffer(
+    const vki::LogicalDevice &logicalDevice,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const vki::Buffer &stagingBuffer,
+    const vki::CommandBuffer &commandBuffer,
+    const vki::GraphicsQueueMixin &graphicsQueue) {
     const auto &verticesSize = sizeof(vertices[0]) * vertices.size();
     VkBufferCreateInfo vertexBufferCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -319,7 +329,6 @@ vki::Buffer createVertexBuffer(const vki::LogicalDevice &logicalDevice,
     };
     auto vertexBuffer = vki::Buffer(logicalDevice, vertexBufferCreateInfo);
     logger.info("Created vertex buffer");
-    const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &vertexBufferMemoryRequirements =
         vertexBuffer.getMemoryRequirements();
     const auto &vertexBufferMemoryTypeIndex = vki::utils::findMemoryType(
@@ -342,12 +351,12 @@ vki::Buffer createVertexBuffer(const vki::LogicalDevice &logicalDevice,
     return vertexBuffer;
 };
 
-vki::Buffer createIndexBuffer(const vki::LogicalDevice &logicalDevice,
-                              const vki::PhysicalDevice &physicalDevice,
-                              el::Logger &logger,
-                              const vki::Buffer &stagingBuffer,
-                              const vki::CommandBuffer &commandBuffer,
-                              const vki::GraphicsQueueMixin &graphicsQueue) {
+vki::Buffer createIndexBuffer(
+    const vki::LogicalDevice &logicalDevice,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const vki::Buffer &stagingBuffer,
+    const vki::CommandBuffer &commandBuffer,
+    const vki::GraphicsQueueMixin &graphicsQueue) {
     const auto &indicesSize = sizeof(indices[0]) * indices.size();
     VkBufferCreateInfo indicesBufferCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -358,7 +367,6 @@ vki::Buffer createIndexBuffer(const vki::LogicalDevice &logicalDevice,
     };
     auto indicesBuffer = vki::Buffer(logicalDevice, indicesBufferCreateInfo);
     logger.info("Created indices buffer");
-    const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &indicesBufferMemoryRequirements =
         indicesBuffer.getMemoryRequirements();
     const auto &indicesBufferMemoryTypeIndex = vki::utils::findMemoryType(
@@ -382,26 +390,26 @@ vki::Buffer createIndexBuffer(const vki::LogicalDevice &logicalDevice,
 
 std::tuple<vki::Buffer, vki::Buffer> createVertexAndIndicesBuffer(
     const vki::LogicalDevice &logicalDevice,
-    const vki::PhysicalDevice &physicalDevice, el::Logger &logger,
-    const vki::CommandPool &commandPool,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const vki::CommandPool &commandPool,
     const vki::GraphicsQueueMixin &graphicsQueue) {
     const auto &verticesSize = sizeof(vertices[0]) * vertices.size();
     const auto &vertexStagingBuffer =
-        createStagingBuffer(logicalDevice, physicalDevice, logger, verticesSize,
-                            (void *)vertices.data());
+        createStagingBuffer(logicalDevice, memoryProperties, logger,
+                            verticesSize, (void *)vertices.data());
     logger.info("Created vertex staging buffer");
     const auto &indicesSize = sizeof(indices[0]) * indices.size();
     const auto &indexStagingBuffer =
-        createStagingBuffer(logicalDevice, physicalDevice, logger, indicesSize,
-                            (void *)indices.data());
+        createStagingBuffer(logicalDevice, memoryProperties, logger,
+                            indicesSize, (void *)indices.data());
     logger.info("Created index staging buffer");
     const auto &commandBuffer = commandPool.createCommandBuffer();
     commandBuffer.begin();
     auto vertexBuffer =
-        createVertexBuffer(logicalDevice, physicalDevice, logger,
+        createVertexBuffer(logicalDevice, memoryProperties, logger,
                            vertexStagingBuffer, commandBuffer, graphicsQueue);
     auto indicesBuffer =
-        createIndexBuffer(logicalDevice, physicalDevice, logger,
+        createIndexBuffer(logicalDevice, memoryProperties, logger,
                           indexStagingBuffer, commandBuffer, graphicsQueue);
     commandBuffer.end();
     graphicsQueue.submit({ vki::SubmitInfo((vki::SubmitInfoInputData){
@@ -409,6 +417,37 @@ std::tuple<vki::Buffer, vki::Buffer> createVertexAndIndicesBuffer(
                          std::nullopt);
     graphicsQueue.waitIdle();
     return { std::move(vertexBuffer), std::move(indicesBuffer) };
+};
+
+std::vector<vki::Buffer> createUniformBuffers(
+    const vki::LogicalDevice &logicalDevice,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const unsigned int buffersCount) {
+    std::vector<vki::Buffer> buffers;
+    buffers.reserve(buffersCount);
+    VkBufferCreateInfo bufferCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = sizeof(UniformBufferObject),
+        .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+    for (int i = 0; i < buffersCount; i++) {
+        auto buffer = vki::Buffer(logicalDevice, bufferCreateInfo);
+        const auto &memoryRequirements = buffer.getMemoryRequirements();
+        const auto &memoryTypeIndex = vki::utils::findMemoryType(
+            memoryRequirements.memoryTypeBits, memoryProperties,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        VkMemoryAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = memoryRequirements.size,
+            .memoryTypeIndex = memoryTypeIndex,
+        };
+        logger.info("Created indices buffer memory");
+        buffer.bindMemory(vki::Memory(logicalDevice, allocInfo));
+        buffers.emplace_back(std::move(buffer));
+    };
+    return buffers;
 };
 
 void run_app() {
@@ -504,8 +543,30 @@ void run_app() {
         vki::RenderPass(logicalDevice, renderPassCreateInfo);
     mainLogger.info("Created render pass");
 
-    const auto &pipeline = createGraphicsPipeline(logicalDevice, mainLogger,
-                                                  swapchainExtent, renderPass);
+    VkDescriptorSetLayoutBinding uboLayoutBinding = {
+        .binding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT
+    };
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &uboLayoutBinding
+    };
+    const auto &descriptorSetLayout =
+        vki::DescriptorSetLayout(logicalDevice, descriptorSetLayoutCreateInfo);
+    const auto &setLayout = descriptorSetLayout.getVkDescriptorSetLayout();
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &setLayout
+    };
+    const auto pipelineLayout =
+        vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
+    mainLogger.info("Created pipeline layout");
+    const auto &pipeline = createGraphicsPipeline(
+        logicalDevice, mainLogger, swapchainExtent, renderPass, pipelineLayout);
     mainLogger.info("Created pipeline");
     const auto &framebuffers =
         swapchain.swapChainImageViews |
@@ -528,9 +589,73 @@ void run_app() {
     mainLogger.info("Created framebuffers");
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
+    const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &[vertexBuffer, indexBuffer] = createVertexAndIndicesBuffer(
-        logicalDevice, physicalDevice, mainLogger, commandPool, queue);
-    mainLogger.info("Created buffers");
+        logicalDevice, memoryProperties, mainLogger, commandPool, queue);
+    mainLogger.info("Created index and vertex buffers");
+    const auto &uniformBuffers =
+        createUniformBuffers(logicalDevice, memoryProperties, mainLogger,
+                             swapchain.swapChainImageViews.size());
+    mainLogger.info("Created uniform buffers");
+    std::vector<void *> uniformMapped(uniformBuffers.size());
+    int index = 0;
+    for (const auto &buffer : uniformBuffers) {
+        buffer.getMemory().value().mapMemory(sizeof(UniformBufferObject),
+                                             &uniformMapped[index]);
+        index += 1;
+    };
+    mainLogger.info("Mapped uniform buffers");
+    VkDescriptorPoolSize poolSize = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                      .descriptorCount = static_cast<uint32_t>(
+                                          uniformBuffers.size()) };
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = static_cast<uint32_t>(uniformBuffers.size()),
+        .poolSizeCount = 1,
+        .pPoolSizes = &poolSize,
+    };
+    VkDescriptorPool descriptorPool;
+    VkResult result = vkCreateDescriptorPool(logicalDevice.getVkDevice(),
+                                             &descriptorPoolCreateInfo, nullptr,
+                                             &descriptorPool);
+    vki::assertSuccess(result, "vkCreateDescriptorPool");
+    mainLogger.info("Created descriptor pool");
+    std::vector<VkDescriptorSetLayout> layouts(
+        uniformBuffers.size(), descriptorSetLayout.getVkDescriptorSetLayout());
+    VkDescriptorSetAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = descriptorPool,
+        .descriptorSetCount = static_cast<uint32_t>(uniformBuffers.size()),
+        .pSetLayouts = layouts.data()
+    };
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.resize(uniformBuffers.size());
+    result = vkAllocateDescriptorSets(logicalDevice.getVkDevice(), &allocInfo,
+                                      descriptorSets.data());
+    vki::assertSuccess(result, "vkAllocateDescriptorSets");
+    mainLogger.info("Allocated descriptor sets");
+    mainLogger.info(descriptorSets);
+    for (size_t i = 0; i < descriptorSets.size(); i++) {
+        VkDescriptorBufferInfo bufferInfo = {
+            .buffer = uniformBuffers[i].getVkBuffer(),
+            .offset = 0,
+            .range = sizeof(UniformBufferObject)
+        };
+        VkWriteDescriptorSet descriptorWrite = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = descriptorSets[i],
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pImageInfo = nullptr,
+            .pBufferInfo = &bufferInfo,
+            .pTexelBufferView = nullptr
+        };
+
+        vkUpdateDescriptorSets(logicalDevice.getVkDevice(), 1, &descriptorWrite,
+                               0, nullptr);
+    };
     const auto &commandBuffer = commandPool.createCommandBuffer();
     mainLogger.info("Created command buffer");
     const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);
@@ -543,7 +668,8 @@ void run_app() {
         drawFrame(logicalDevice, swapchain, swapchainExtent, renderPass,
                   pipeline, framebuffers, commandBuffer, inFlightFence,
                   imageAvailableSemaphore, renderFinishedSemaphore,
-                  vertexBuffer, indexBuffer, queue, queue);
+                  vertexBuffer, indexBuffer, queue, queue, uniformMapped,
+                  pipelineLayout, descriptorSets);
     };
 
     mainLogger.info("Waiting for queued operations to complete...");
@@ -604,7 +730,10 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const vki::Semaphore &renderFinishedSemaphore,
                const vki::Buffer &vertexBuffer, const vki::Buffer &indexBuffer,
                const vki::GraphicsQueueMixin &graphicsQueue,
-               const vki::PresentQueueMixin &presentQueue) {
+               const vki::PresentQueueMixin &presentQueue,
+               const std::vector<void *> &uniformMapped,
+               const vki::PipelineLayout &pipelineLayout,
+               const std::vector<VkDescriptorSet> &descriptorSets) {
     inFlightFence.wait();
 
     uint32_t imageIndex =
@@ -612,8 +741,25 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
     commandBuffer.reset();
     recordCommandBuffer(framebuffers[imageIndex], swapchain, swapchainExtent,
                         renderPass, pipeline, commandBuffer, vertexBuffer,
-                        indexBuffer);
-
+                        indexBuffer, pipelineLayout, descriptorSets,
+                        imageIndex);
+    static auto startTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(
+                     currentTime - startTime)
+                     .count();
+    UniformBufferObject ubo = {
+        .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),
+                             glm::vec3(0.0f, 0.0f, 1.0f)),
+        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                            glm::vec3(0.0f, 0.0f, 0.0f),
+                            glm::vec3(0.0f, 0.0f, 1.0f)),
+        .proj = glm::perspective(
+            glm::radians(45.0f),
+            swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f),
+    };
+    ubo.proj[1][1] *= -1;
+    memcpy(uniformMapped[imageIndex], &ubo, sizeof(ubo));
     const vki::SubmitInfo submitInfo(
         { .waitSemaphores = { &imageAvailableSemaphore },
           .signalSemaphores = { &renderFinishedSemaphore },
@@ -628,14 +774,14 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
     presentQueue.present(presentInfo);
 };
 
-void recordCommandBuffer(const vki::Framebuffer &framebuffer,
-                         const vki::Swapchain &swapchain,
-                         const VkExtent2D &swapchainExtent,
-                         const vki::RenderPass &renderPass,
-                         const vki::GraphicsPipeline &pipeline,
-                         const vki::CommandBuffer &commandBuffer,
-                         const vki::Buffer &vertexBuffer,
-                         const vki::Buffer &indexBuffer) {
+void recordCommandBuffer(
+    const vki::Framebuffer &framebuffer, const vki::Swapchain &swapchain,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
+    const vki::GraphicsPipeline &pipeline,
+    const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
+    const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
+    const std::vector<VkDescriptorSet> &descriptorSets,
+    const unsigned int imageIndex) {
     commandBuffer.begin();
 
     VkClearValue clearColor = { .color = {
@@ -660,6 +806,10 @@ void recordCommandBuffer(const vki::Framebuffer &framebuffer,
         .offset = 0,
         .type = VK_INDEX_TYPE_UINT16,
     });
+    const auto &descriptorSet = &descriptorSets[imageIndex];
+    vkCmdBindDescriptorSets(
+        commandBuffer.getVkCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipelineLayout.getVkPipelineLayout(), 0, 1, descriptorSet, 0, nullptr);
     commandBuffer.drawIndexed(
         { .indexCount = static_cast<unsigned int>(indices.size()),
           .instanceCount = 1,

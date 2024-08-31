@@ -10,8 +10,10 @@
 #include "vulkan_app/vki/memory.hpp"
 
 vki::Buffer::Buffer(const vki::Buffer &other)
-    : device{ other.device }, vkBuffer{ other.vkBuffer }, is_owner{ false } {
-};
+    : device{ other.device },
+      vkBuffer{ other.vkBuffer },
+      is_owner{ false },
+      memory{ other.memory } {};
 
 vki::Buffer::Buffer(vki::Buffer &&other)
     : device{ other.device },
@@ -39,6 +41,10 @@ VkMemoryRequirements vki::Buffer::getMemoryRequirements() const {
 void vki::Buffer::bindMemory(vki::Memory &&newMemory) {
     memory.emplace(newMemory);
     vkBindBufferMemory(device, vkBuffer, newMemory.getVkMemory(), 0);
+};
+
+const std::optional<vki::Memory> vki::Buffer::getMemory() const {
+    return memory;
 };
 
 vki::Buffer::~Buffer() {

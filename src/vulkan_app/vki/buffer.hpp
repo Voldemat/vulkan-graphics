@@ -21,6 +21,7 @@ public:
                     VkBufferCreateInfo createInfo);
     VkBuffer getVkBuffer() const;
     void bindMemory(vki::Memory &&memory);
+    const std::optional<vki::Memory> getMemory() const;
     VkMemoryRequirements getMemoryRequirements() const;
     ~Buffer();
 };

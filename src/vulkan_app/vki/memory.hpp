@@ -23,6 +23,7 @@ class Memory : Borrowable {
 public:
     Memory(vki::Memory&& other);
     Memory(vki::Memory& other);
+    Memory(const vki::Memory& other);
     explicit Memory(const vki::LogicalDevice &device,
                     VkMemoryAllocateInfo allocInfo);
     VkDeviceMemory getVkMemory() const;

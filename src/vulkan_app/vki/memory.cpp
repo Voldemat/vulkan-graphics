@@ -13,6 +13,11 @@ vki::Memory::Memory(vki::Memory &other)
       device{ other.device },
       vkMemory{ other.vkMemory } {};
 
+vki::Memory::Memory(const vki::Memory &other)
+    : vki::Borrowable(other),
+      device{ other.device },
+      vkMemory{ other.vkMemory } {};
+
 vki::Memory::Memory(vki::Memory &&other)
     : vki::Borrowable(other),
       device{ other.device },
