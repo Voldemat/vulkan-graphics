@@ -7,6 +7,7 @@
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
+#include "vulkan_app/vki/pipeline_layout.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
 
 namespace vki {
@@ -65,6 +66,14 @@ struct BindIndexBufferArgs {
     VkIndexType type;
 };
 
+struct BindDescriptorSetsArgs {
+    vki::PipelineBindPointType bindPointType;
+    vki::PipelineLayout pipelineLayout;
+    unsigned int firstSet;
+    std::vector<VkDescriptorSet> descriptorSets;
+    std::vector<unsigned int> dynamicOffsets;
+};
+
 class CommandBuffer {
     VkCommandBuffer vkCommandBuffer;
 
@@ -91,5 +100,6 @@ public:
     void drawIndexed(const vki::DrawIndexedArgs &args) const;
     void bindVertexBuffers(const vki::BindVertexBuffersArgs &args) const;
     void bindIndexBuffer(const vki::BindIndexBufferArgs &args) const;
+    void bindDescriptorSet(const vki::BindDescriptorSetsArgs& args) const;
 };
 };  // namespace vki

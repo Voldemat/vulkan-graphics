@@ -10,7 +10,6 @@
 #include <cstring>
 #include <format>
 #include <functional>
-#include <iostream>
 #include <limits>
 #include <optional>
 #include <ranges>
@@ -34,6 +33,7 @@
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
+#include "vulkan_app/vki/descriptor_pool.hpp"
 #include "vulkan_app/vki/descriptor_set_layout.hpp"
 #include "vulkan_app/vki/fence.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
@@ -128,8 +128,7 @@ void recordCommandBuffer(
     const vki::GraphicsPipeline &pipeline,
     const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
     const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
-    const std::vector<VkDescriptorSet> &descriptorSets,
-    const unsigned int imageIndex);
+    const VkDescriptorSet &descriptorSet);
 
 vki::PresentMode choosePresentMode(
     const std::unordered_set<vki::PresentMode> &presentModes) {
@@ -598,11 +597,10 @@ void run_app() {
                              swapchain.swapChainImageViews.size());
     mainLogger.info("Created uniform buffers");
     std::vector<void *> uniformMapped(uniformBuffers.size());
-    int index = 0;
-    for (const auto &buffer : uniformBuffers) {
+    for (const auto &[buffer, memory] :
+         std::views::zip(uniformBuffers, uniformMapped)) {
         buffer.getMemory().value().mapMemory(sizeof(UniformBufferObject),
-                                             &uniformMapped[index]);
-        index += 1;
+                                             &memory);
     };
     mainLogger.info("Mapped uniform buffers");
     VkDescriptorPoolSize poolSize = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -614,23 +612,18 @@ void run_app() {
         .poolSizeCount = 1,
         .pPoolSizes = &poolSize,
     };
-    VkDescriptorPool descriptorPool;
-    VkResult result = vkCreateDescriptorPool(logicalDevice.getVkDevice(),
-                                             &descriptorPoolCreateInfo, nullptr,
-                                             &descriptorPool);
-    vki::assertSuccess(result, "vkCreateDescriptorPool");
+    const auto& descriptorPool = vki::DescriptorPool(logicalDevice, descriptorPoolCreateInfo);
     mainLogger.info("Created descriptor pool");
     std::vector<VkDescriptorSetLayout> layouts(
         uniformBuffers.size(), descriptorSetLayout.getVkDescriptorSetLayout());
     VkDescriptorSetAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = descriptorPool,
+        .descriptorPool = descriptorPool.getVkDescriptorPool(),
         .descriptorSetCount = static_cast<uint32_t>(uniformBuffers.size()),
         .pSetLayouts = layouts.data()
     };
-    std::vector<VkDescriptorSet> descriptorSets;
-    descriptorSets.resize(uniformBuffers.size());
-    result = vkAllocateDescriptorSets(logicalDevice.getVkDevice(), &allocInfo,
+    std::vector<VkDescriptorSet> descriptorSets(uniformBuffers.size());
+    VkResult result = vkAllocateDescriptorSets(logicalDevice.getVkDevice(), &allocInfo,
                                       descriptorSets.data());
     vki::assertSuccess(result, "vkAllocateDescriptorSets");
     mainLogger.info("Allocated descriptor sets");
@@ -741,8 +734,8 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
     commandBuffer.reset();
     recordCommandBuffer(framebuffers[imageIndex], swapchain, swapchainExtent,
                         renderPass, pipeline, commandBuffer, vertexBuffer,
-                        indexBuffer, pipelineLayout, descriptorSets,
-                        imageIndex);
+                        indexBuffer, pipelineLayout,
+                        descriptorSets[imageIndex]);
     static auto startTime = std::chrono::high_resolution_clock::now();
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(
@@ -780,8 +773,7 @@ void recordCommandBuffer(
     const vki::GraphicsPipeline &pipeline,
     const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
     const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
-    const std::vector<VkDescriptorSet> &descriptorSets,
-    const unsigned int imageIndex) {
+    const VkDescriptorSet &descriptorSet) {
     commandBuffer.begin();
 
     VkClearValue clearColor = { .color = {
@@ -806,10 +798,13 @@ void recordCommandBuffer(
         .offset = 0,
         .type = VK_INDEX_TYPE_UINT16,
     });
-    const auto &descriptorSet = &descriptorSets[imageIndex];
-    vkCmdBindDescriptorSets(
-        commandBuffer.getVkCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipelineLayout.getVkPipelineLayout(), 0, 1, descriptorSet, 0, nullptr);
+    commandBuffer.bindDescriptorSet({
+        .bindPointType = vki::PipelineBindPointType::GRAPHICS,
+        .pipelineLayout = pipelineLayout,
+        .firstSet = 0,
+        .descriptorSets = { descriptorSet },
+        .dynamicOffsets = {},
+    });
     commandBuffer.drawIndexed(
         { .indexCount = static_cast<unsigned int>(indices.size()),
           .instanceCount = 1,

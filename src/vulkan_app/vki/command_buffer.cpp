@@ -2,12 +2,15 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
+#include <iostream>
 #include <ranges>
 #include <vector>
 
 #include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
+#include "vulkan_app/vki/pipeline_layout.hpp"
 
 vki::CommandBuffer::CommandBuffer(const VkCommandPool &commandPool,
                                   const VkDevice &logicalDevice) {
@@ -108,4 +111,15 @@ void vki::CommandBuffer::copyBuffer(
     vkCmdCopyBuffer(vkCommandBuffer, srcBuffer.getVkBuffer(),
                     dstBuffer.getVkBuffer(), copyRegions.size(),
                     copyRegions.data());
+};
+
+void vki::CommandBuffer::bindDescriptorSet(
+    const vki::BindDescriptorSetsArgs &args) const {
+    vkCmdBindDescriptorSets(
+        vkCommandBuffer, static_cast<VkPipelineBindPoint>(args.bindPointType),
+        args.pipelineLayout.getVkPipelineLayout(), args.firstSet,
+        static_cast<uint32_t>(args.descriptorSets.size()),
+        args.descriptorSets.data(),
+        static_cast<uint32_t>(args.dynamicOffsets.size()),
+        args.dynamicOffsets.data());
 };
