@@ -44,3 +44,17 @@ const VkDevice vki::LogicalDevice::getVkDevice() const noexcept {
 
 void vki::LogicalDevice::waitIdle() const { vkDeviceWaitIdle(device); };
 
+std::vector<VkDescriptorSet> vki::LogicalDevice::allocateDescriptorSets(
+    const VkDescriptorSetAllocateInfo &allocInfo) const {
+    std::vector<VkDescriptorSet> descriptorSets(allocInfo.descriptorSetCount);
+    VkResult result =
+        vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data());
+    vki::assertSuccess(result, "vkAllocateDescriptorSets");
+    return descriptorSets;
+};
+
+void vki::LogicalDevice::updateWriteDescriptorSets(
+    const std::vector<VkWriteDescriptorSet> &writeInfos) const {
+    vkUpdateDescriptorSets(device, writeInfos.size(), writeInfos.data(), 0,
+                           nullptr);
+};

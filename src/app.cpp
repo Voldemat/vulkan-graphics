@@ -29,7 +29,6 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/trigonometric.hpp"
 #include "shaders.hpp"
-#include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
@@ -418,7 +417,7 @@ std::tuple<vki::Buffer, vki::Buffer> createVertexAndIndicesBuffer(
     return { std::move(vertexBuffer), std::move(indicesBuffer) };
 };
 
-std::vector<vki::Buffer> createUniformBuffers(
+std::tuple<std::vector<vki::Buffer>, std::vector<void *>> createUniformBuffers(
     const vki::LogicalDevice &logicalDevice,
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
     el::Logger &logger, const unsigned int buffersCount) {
@@ -442,11 +441,73 @@ std::vector<vki::Buffer> createUniformBuffers(
             .allocationSize = memoryRequirements.size,
             .memoryTypeIndex = memoryTypeIndex,
         };
-        logger.info("Created indices buffer memory");
         buffer.bindMemory(vki::Memory(logicalDevice, allocInfo));
         buffers.emplace_back(std::move(buffer));
     };
-    return buffers;
+    std::vector<void *> uniformMapped(buffers.size());
+    for (const auto &[buffer, memory] :
+         std::views::zip(buffers, uniformMapped)) {
+        buffer.getMemory().value().mapMemory(sizeof(UniformBufferObject),
+                                             &memory);
+    };
+    logger.info("Mapped uniform buffers");
+    return { std::move(buffers), uniformMapped };
+};
+
+std::vector<VkDescriptorSet> createDescriptorSets(
+    const vki::LogicalDevice &logicalDevice,
+    const std::vector<vki::Buffer> &uniformBuffers,
+    const vki::DescriptorPool &descriptorPool,
+    const vki::DescriptorSetLayout &descriptorSetLayout, el::Logger &logger) {
+    std::vector<VkDescriptorSetLayout> layouts(
+        uniformBuffers.size(), descriptorSetLayout.getVkDescriptorSetLayout());
+    VkDescriptorSetAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = descriptorPool.getVkDescriptorPool(),
+        .descriptorSetCount = static_cast<uint32_t>(uniformBuffers.size()),
+        .pSetLayouts = layouts.data()
+    };
+    const auto &descriptorSets =
+        logicalDevice.allocateDescriptorSets(allocInfo);
+    logger.info("Allocated descriptor sets");
+    std::vector<VkDescriptorBufferInfo> bufferInfos(descriptorSets.size());
+    std::vector<VkWriteDescriptorSet> writeInfos(descriptorSets.size());
+    for (size_t i = 0; i < descriptorSets.size(); i++) {
+        VkDescriptorBufferInfo bufferInfo = {
+            .buffer = uniformBuffers[i].getVkBuffer(),
+            .offset = 0,
+            .range = sizeof(UniformBufferObject)
+        };
+        bufferInfos[i] = bufferInfo;
+        VkWriteDescriptorSet descriptorWrite = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = descriptorSets[i],
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pImageInfo = nullptr,
+            .pBufferInfo = &bufferInfo,
+            .pTexelBufferView = nullptr
+        };
+        writeInfos[i] = descriptorWrite;
+    };
+    logicalDevice.updateWriteDescriptorSets(writeInfos);
+    return descriptorSets;
+};
+
+vki::DescriptorPool createDescriptorPool(
+    const vki::LogicalDevice &logicalDevice,
+    const uint32_t &uniformBuffersCount) {
+    VkDescriptorPoolSize poolSize = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                      .descriptorCount = uniformBuffersCount };
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = uniformBuffersCount,
+        .poolSizeCount = 1,
+        .pPoolSizes = &poolSize,
+    };
+    return vki::DescriptorPool(logicalDevice, descriptorPoolCreateInfo);
 };
 
 void run_app() {
@@ -592,63 +653,16 @@ void run_app() {
     const auto &[vertexBuffer, indexBuffer] = createVertexAndIndicesBuffer(
         logicalDevice, memoryProperties, mainLogger, commandPool, queue);
     mainLogger.info("Created index and vertex buffers");
-    const auto &uniformBuffers =
+    const auto &[uniformBuffers, uniformMappedMemory] =
         createUniformBuffers(logicalDevice, memoryProperties, mainLogger,
                              swapchain.swapChainImageViews.size());
     mainLogger.info("Created uniform buffers");
-    std::vector<void *> uniformMapped(uniformBuffers.size());
-    for (const auto &[buffer, memory] :
-         std::views::zip(uniformBuffers, uniformMapped)) {
-        buffer.getMemory().value().mapMemory(sizeof(UniformBufferObject),
-                                             &memory);
-    };
-    mainLogger.info("Mapped uniform buffers");
-    VkDescriptorPoolSize poolSize = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                      .descriptorCount = static_cast<uint32_t>(
-                                          uniformBuffers.size()) };
-    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = static_cast<uint32_t>(uniformBuffers.size()),
-        .poolSizeCount = 1,
-        .pPoolSizes = &poolSize,
-    };
-    const auto& descriptorPool = vki::DescriptorPool(logicalDevice, descriptorPoolCreateInfo);
+    const auto &descriptorPool =
+        createDescriptorPool(logicalDevice, uniformBuffers.size());
     mainLogger.info("Created descriptor pool");
-    std::vector<VkDescriptorSetLayout> layouts(
-        uniformBuffers.size(), descriptorSetLayout.getVkDescriptorSetLayout());
-    VkDescriptorSetAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = descriptorPool.getVkDescriptorPool(),
-        .descriptorSetCount = static_cast<uint32_t>(uniformBuffers.size()),
-        .pSetLayouts = layouts.data()
-    };
-    std::vector<VkDescriptorSet> descriptorSets(uniformBuffers.size());
-    VkResult result = vkAllocateDescriptorSets(logicalDevice.getVkDevice(), &allocInfo,
-                                      descriptorSets.data());
-    vki::assertSuccess(result, "vkAllocateDescriptorSets");
-    mainLogger.info("Allocated descriptor sets");
-    mainLogger.info(descriptorSets);
-    for (size_t i = 0; i < descriptorSets.size(); i++) {
-        VkDescriptorBufferInfo bufferInfo = {
-            .buffer = uniformBuffers[i].getVkBuffer(),
-            .offset = 0,
-            .range = sizeof(UniformBufferObject)
-        };
-        VkWriteDescriptorSet descriptorWrite = {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = descriptorSets[i],
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pImageInfo = nullptr,
-            .pBufferInfo = &bufferInfo,
-            .pTexelBufferView = nullptr
-        };
-
-        vkUpdateDescriptorSets(logicalDevice.getVkDevice(), 1, &descriptorWrite,
-                               0, nullptr);
-    };
+    const auto &descriptorSets =
+        createDescriptorSets(logicalDevice, uniformBuffers, descriptorPool,
+                             descriptorSetLayout, mainLogger);
     const auto &commandBuffer = commandPool.createCommandBuffer();
     mainLogger.info("Created command buffer");
     const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);
@@ -661,7 +675,7 @@ void run_app() {
         drawFrame(logicalDevice, swapchain, swapchainExtent, renderPass,
                   pipeline, framebuffers, commandBuffer, inFlightFence,
                   imageAvailableSemaphore, renderFinishedSemaphore,
-                  vertexBuffer, indexBuffer, queue, queue, uniformMapped,
+                  vertexBuffer, indexBuffer, queue, queue, uniformMappedMemory,
                   pipelineLayout, descriptorSets);
     };
 

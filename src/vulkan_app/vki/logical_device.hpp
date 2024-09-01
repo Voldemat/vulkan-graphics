@@ -49,6 +49,10 @@ public:
     LogicalDevice(LogicalDevice &&other);
     const VkDevice getVkDevice() const noexcept;
     void waitIdle() const;
+    std::vector<VkDescriptorSet> allocateDescriptorSets(
+        const VkDescriptorSetAllocateInfo &allocInfo) const;
+    void updateWriteDescriptorSets(
+        const std::vector<VkWriteDescriptorSet> &writeInfos) const;
     ~LogicalDevice();
 };
 
