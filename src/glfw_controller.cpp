@@ -14,6 +14,7 @@ GLFWControllerWindow::GLFWControllerWindow(const std::string &name,
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     window = glfwCreateWindow(width, height, name.c_str(), nullptr, nullptr);
 };
+
 bool GLFWControllerWindow::shouldClose() const {
     return glfwWindowShouldClose(window);
 };
