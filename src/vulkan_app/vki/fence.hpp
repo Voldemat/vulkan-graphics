@@ -9,11 +9,13 @@ class Fence {
     VkDevice device;
 
 public:
-    explicit Fence(const vki::LogicalDevice &logicalDevice);
+    explicit Fence(const vki::LogicalDevice &logicalDevice, const bool& initialState);
     Fence(const Fence &) = delete;
     Fence(const Fence &&) = delete;
     const VkFence getVkFence() const;
     void wait() const;
+    void reset() const;
+    void waitAndReset() const;
     ~Fence();
 };
 };  // namespace vki

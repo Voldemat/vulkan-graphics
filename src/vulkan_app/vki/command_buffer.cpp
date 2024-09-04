@@ -3,7 +3,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <iostream>
+#include <functional>
 #include <ranges>
 #include <vector>
 
@@ -122,4 +122,19 @@ void vki::CommandBuffer::bindDescriptorSet(
         args.descriptorSets.data(),
         static_cast<uint32_t>(args.dynamicOffsets.size()),
         args.dynamicOffsets.data());
+};
+
+void vki::CommandBuffer::record(const std::function<void()> &func) const {
+    begin();
+    func();
+    end();
+};
+
+void vki::CommandBuffer::withRenderPass(
+    const vki::RenderPassBeginInfo &renderPassBeginInfo,
+    const vki::SubpassContentsType &subpassContentsType,
+    const std::function<void()> &func) const {
+    beginRenderPass(renderPassBeginInfo, subpassContentsType);
+    func();
+    endRenderPass();
 };

@@ -40,7 +40,7 @@ public:
     {
         static_assert(QueueIndex < QueueCount,
                       "QueueIndex must be less than QueueCount");
-        unsigned int queueFamilyIndex = createInfo.queueFamily.family->index;
+        unsigned int queueFamilyIndex = createInfo.queueFamily.family.index;
         VkQueue queue;
         vkGetDeviceQueue(device, queueFamilyIndex, QueueIndex, &queue);
         return vki::Queue<T...>(queue, queueFamilyIndex);

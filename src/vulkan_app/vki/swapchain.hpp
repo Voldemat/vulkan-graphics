@@ -51,8 +51,8 @@ VkImageUsageFlags imageUsageToVk(
 struct SwapchainSharingInfo {
     std::optional<std::vector<unsigned int>> queueIndices;
     explicit SwapchainSharingInfo(
-        vki::QueueFamily const *graphicsQueueFamily,
-        vki::QueueFamily const *presentQueueFamily);
+        const vki::QueueFamily& graphicsQueueFamily,
+        const vki::QueueFamily& presentQueueFamily);
 };
 
 struct SwapchainCreateInfo {

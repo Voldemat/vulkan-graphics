@@ -15,11 +15,10 @@
 #include "vulkan_app/vki/surface.hpp"
 
 vki::SwapchainSharingInfo::SwapchainSharingInfo(
-    const vki::QueueFamily *graphicsQueueFamily,
-    const vki::QueueFamily *presentQueueFamily) {
-    if (graphicsQueueFamily->index != presentQueueFamily->index) {
-        queueIndices = { graphicsQueueFamily->index,
-                         presentQueueFamily->index };
+    const vki::QueueFamily &graphicsQueueFamily,
+    const vki::QueueFamily &presentQueueFamily) {
+    if (graphicsQueueFamily.index != presentQueueFamily.index) {
+        queueIndices = { graphicsQueueFamily.index, presentQueueFamily.index };
     };
 };
 

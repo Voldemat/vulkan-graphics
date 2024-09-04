@@ -28,6 +28,7 @@
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/trigonometric.hpp"
+#include "magic_enum.hpp"
 #include "shaders.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
@@ -121,14 +122,6 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const vki::PipelineLayout &pipelineLayout,
                const std::vector<VkDescriptorSet> &descriptorSets);
 
-void recordCommandBuffer(
-    const vki::Framebuffer &framebuffer, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::GraphicsPipeline &pipeline,
-    const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
-    const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
-    const VkDescriptorSet &descriptorSet);
-
 vki::PresentMode choosePresentMode(
     const std::unordered_set<vki::PresentMode> &presentModes) {
     if (presentModes.contains(vki::PresentMode::MAILBOX_KHR))
@@ -159,11 +152,6 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities,
         .height = std::clamp(height, capabilities.minImageExtent.height,
                              capabilities.maxImageExtent.height)
     };
-};
-
-uint32_t getImageCount(const VkSurfaceCapabilitiesKHR &capabilities) {
-    return std::clamp(capabilities.minImageCount + 1,
-                      capabilities.minImageCount, capabilities.maxImageCount);
 };
 
 vki::GraphicsPipeline createGraphicsPipeline(
@@ -510,66 +498,10 @@ vki::DescriptorPool createDescriptorPool(
     return vki::DescriptorPool(logicalDevice, descriptorPoolCreateInfo);
 };
 
-void run_app() {
-    auto &mainLogger = *el::Loggers::getLogger("main");
-    mainLogger.info("Creating GLFWController...");
-    GLFWController controller;
-    mainLogger.info("Created GLFWController");
-    mainLogger.info("Obtaining GLFWControllerWindow...");
-    GLFWControllerWindow window =
-        controller.createWindow("Hello triangle", 800, 600);
-    mainLogger.info("Obtained GLFWControllerWindow...");
-    const auto &requiredExtensions = controller.getRequiredExtensions();
-    mainLogger.info("GLFW Required extensions: ");
-    mainLogger.info(requiredExtensions);
-    vki::VulkanInstance instance({
-        .extensions = requiredExtensions,
-        .appName = "Hello triangle",
-        .appVersion = { 1, 0, 0 },
-        .apiVersion = VK_API_VERSION_1_3,
-        .layers = { "VK_LAYER_KHRONOS_validation" },
-    });
-    vki::Surface surface(instance, window);
-    vki::PhysicalDevice physicalDevice =
-        pickPhysicalDevice(instance, surface, mainLogger);
-    const auto &queueFamilies = physicalDevice.getQueueFamilies();
-    mainLogger.info(
-        std::format("Picked physical device: {}", (std::string)physicalDevice));
-    const auto &queueFamily = pickQueueFamily(queueFamilies);
-    mainLogger.info(std::format("Picked graphics and present queue family: {}",
-                                (std::string)*queueFamily.family));
-    const auto &queueCreateInfo =
-        vki::QueueCreateInfo<1, 1, vki::QueueOperationType::GRAPHIC,
-                             vki::QueueOperationType::PRESENT>(queueFamily);
-    const vki::LogicalDevice logicalDevice =
-        vki::LogicalDevice(physicalDevice, std::make_tuple(queueCreateInfo));
-    mainLogger.info("Created logical device");
-    const auto &queue = logicalDevice.getQueue<0>(queueCreateInfo);
-    const auto &surfaceDetails = surface.getDetails(physicalDevice);
-    const auto &swapchainExtent =
-        chooseSwapExtent(surfaceDetails.capabilities, window);
-    const auto &swapchainFormat = chooseFormat(surfaceDetails.formats);
-    const auto &surfaceMinImageCount =
-        getImageCount(surfaceDetails.capabilities);
-    const auto &swapchainPresentMode =
-        choosePresentMode(surfaceDetails.presentModes);
-    const vki::Swapchain &swapchain = vki::Swapchain(
-        logicalDevice,
-        { .surface = surface,
-          .extent = swapchainExtent,
-          .presentMode = swapchainPresentMode,
-          .format = swapchainFormat,
-          .minImageCount = surfaceMinImageCount,
-          .preTransform = surfaceDetails.capabilities.currentTransform,
-          .imageUsage = { vki::ImageUsage::COLOR_ATTACHMENT },
-          .compositeAlpha = vki::CompositeAlpha::OPAQUE_BIT_KHR,
-          .isClipped = true,
-          .sharingInfo = vki::SwapchainSharingInfo(queueFamily.family,
-                                                   queueFamily.family) });
-    mainLogger.info("Created swapchain");
-
+vki::RenderPass createRenderPass(const vki::LogicalDevice &logicalDevice,
+                                 const VkFormat &swapchainFormat) {
     VkAttachmentDescription colorAttachment = {
-        .format = swapchainFormat.format,
+        .format = swapchainFormat,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -599,10 +531,11 @@ void run_app() {
         .subpasses = { subpass },
         .dependencies = { dependency },
     };
-    const auto renderPass =
-        vki::RenderPass(logicalDevice, renderPassCreateInfo);
-    mainLogger.info("Created render pass");
+    return vki::RenderPass(logicalDevice, renderPassCreateInfo);
+};
 
+vki::DescriptorSetLayout createDescriptorSetLayout(
+    const vki::LogicalDevice &logicalDevice) {
     VkDescriptorSetLayoutBinding uboLayoutBinding = {
         .binding = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -614,41 +547,151 @@ void run_app() {
         .bindingCount = 1,
         .pBindings = &uboLayoutBinding
     };
-    const auto &descriptorSetLayout =
-        vki::DescriptorSetLayout(logicalDevice, descriptorSetLayoutCreateInfo);
+    return vki::DescriptorSetLayout(logicalDevice,
+                                    descriptorSetLayoutCreateInfo);
+};
+
+vki::PipelineLayout createPipelineLayout(
+    const vki::LogicalDevice &logicalDevice,
+    const vki::DescriptorSetLayout &descriptorSetLayout) {
     const auto &setLayout = descriptorSetLayout.getVkDescriptorSetLayout();
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 1,
         .pSetLayouts = &setLayout
     };
-    const auto pipelineLayout =
-        vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
+    return vki::PipelineLayout(logicalDevice, pipelineLayoutCreateInfo);
+};
+
+std::vector<vki::Framebuffer> createFramebuffers(
+    const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass) {
+    return swapchain.swapChainImageViews |
+           std::views::transform([&swapchain, &swapchainExtent, &renderPass,
+                                  &logicalDevice](const auto &imageView) {
+               VkImageView attachments[] = { imageView };
+
+               VkFramebufferCreateInfo createInfo = {
+                   .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                   .renderPass = renderPass.getVkRenderPass(),
+                   .attachmentCount = 1,
+                   .pAttachments = attachments,
+                   .width = swapchainExtent.width,
+                   .height = swapchainExtent.height,
+                   .layers = 1,
+               };
+               return vki::Framebuffer(logicalDevice, createInfo);
+           }) |
+           std::ranges::to<std::vector>();
+};
+
+void run_app() {
+    auto &mainLogger = *el::Loggers::getLogger("main");
+    GLFWController controller;
+    mainLogger.info("Created GLFWController");
+
+    GLFWControllerWindow window =
+        controller.createWindow("Hello triangle", 800, 600);
+    mainLogger.info("Obtained GLFWControllerWindow...");
+
+    const auto &requiredExtensions = controller.getRequiredExtensions();
+    mainLogger.info("GLFW Required extensions: ");
+    mainLogger.info(requiredExtensions);
+
+    vki::VulkanInstance instance({
+        .extensions = requiredExtensions,
+        .appName = "Hello triangle",
+        .appVersion = { 1, 0, 0 },
+        .apiVersion = VK_API_VERSION_1_3,
+        .layers = { "VK_LAYER_KHRONOS_validation" },
+    });
+    mainLogger.info("Created vulkan instance");
+
+    vki::Surface surface(instance, window);
+    mainLogger.info("Created surface");
+
+    vki::PhysicalDevice physicalDevice =
+        pickPhysicalDevice(instance, surface, mainLogger);
+    mainLogger.info(
+        std::format("Picked physical device: {}", (std::string)physicalDevice));
+
+    const auto &queueFamily =
+        pickQueueFamily(physicalDevice.getQueueFamilies());
+    mainLogger.info(std::format("Picked graphics and present queue family: {}",
+                                (std::string)queueFamily.family));
+
+    const auto &queueCreateInfo =
+        vki::QueueCreateInfo<1, 1, vki::QueueOperationType::GRAPHIC,
+                             vki::QueueOperationType::PRESENT>(queueFamily);
+    const vki::LogicalDevice logicalDevice =
+        vki::LogicalDevice(physicalDevice, std::make_tuple(queueCreateInfo));
+    mainLogger.info("Created logical device");
+    const auto &queue = logicalDevice.getQueue<0>(queueCreateInfo);
+
+    const auto &surfaceDetails = surface.getDetails(physicalDevice);
+    mainLogger.info("Got surface details");
+
+    const auto &swapchainExtent =
+        chooseSwapExtent(surfaceDetails.capabilities, window);
+    mainLogger.info(
+        std::format("Choose swapchain extent: width - {}, height - {}",
+                    swapchainExtent.width, swapchainExtent.height));
+
+    const auto &swapchainFormat = chooseFormat(surfaceDetails.formats);
+    mainLogger.info(
+        std::format("Choose swapchain format: format - {}, colorSpace - {}",
+                    magic_enum::enum_name(swapchainFormat.format),
+                    magic_enum::enum_name(swapchainFormat.colorSpace)));
+
+    const auto swapchainMinImageCount =
+        std::clamp(surfaceDetails.capabilities.minImageCount + 1,
+                   surfaceDetails.capabilities.minImageCount,
+                   surfaceDetails.capabilities.maxImageCount);
+    mainLogger.info(std::format("Choose swapchain minImageCount: {}",
+                                swapchainMinImageCount));
+
+    const auto &swapchainPresentMode =
+        choosePresentMode(surfaceDetails.presentModes);
+    mainLogger.info(std::format("Choose swapchain present mode: {}",
+                                magic_enum::enum_name(swapchainPresentMode)));
+
+    const vki::Swapchain &swapchain = vki::Swapchain(
+        logicalDevice,
+        { .surface = surface,
+          .extent = swapchainExtent,
+          .presentMode = swapchainPresentMode,
+          .format = swapchainFormat,
+          .minImageCount = swapchainMinImageCount,
+          .preTransform = surfaceDetails.capabilities.currentTransform,
+          .imageUsage = { vki::ImageUsage::COLOR_ATTACHMENT },
+          .compositeAlpha = vki::CompositeAlpha::OPAQUE_BIT_KHR,
+          .isClipped = true,
+          .sharingInfo = vki::SwapchainSharingInfo(queueFamily.family,
+                                                   queueFamily.family) });
+    mainLogger.info("Created swapchain");
+
+    const auto &renderPass =
+        createRenderPass(logicalDevice, swapchainFormat.format);
+    mainLogger.info("Created render pass");
+
+    const auto &descriptorSetLayout = createDescriptorSetLayout(logicalDevice);
+    mainLogger.info("Created descriptor set layout");
+
+    const auto &pipelineLayout =
+        createPipelineLayout(logicalDevice, descriptorSetLayout);
     mainLogger.info("Created pipeline layout");
+
     const auto &pipeline = createGraphicsPipeline(
         logicalDevice, mainLogger, swapchainExtent, renderPass, pipelineLayout);
     mainLogger.info("Created pipeline");
-    const auto &framebuffers =
-        swapchain.swapChainImageViews |
-        std::views::transform([&swapchain, &swapchainExtent, &renderPass,
-                               &logicalDevice](const auto &imageView) {
-            VkImageView attachments[] = { imageView };
 
-            VkFramebufferCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .renderPass = renderPass.getVkRenderPass(),
-                .attachmentCount = 1,
-                .pAttachments = attachments,
-                .width = swapchainExtent.width,
-                .height = swapchainExtent.height,
-                .layers = 1,
-            };
-            return vki::Framebuffer(logicalDevice, createInfo);
-        }) |
-        std::ranges::to<std::vector>();
+    const auto &framebuffers = createFramebuffers(logicalDevice, swapchain,
+                                                  swapchainExtent, renderPass);
     mainLogger.info("Created framebuffers");
+
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
+
     const auto &memoryProperties = physicalDevice.getMemoryProperties();
     const auto &[vertexBuffer, indexBuffer] = createVertexAndIndicesBuffer(
         logicalDevice, memoryProperties, mainLogger, commandPool, queue);
@@ -657,18 +700,24 @@ void run_app() {
         createUniformBuffers(logicalDevice, memoryProperties, mainLogger,
                              swapchain.swapChainImageViews.size());
     mainLogger.info("Created uniform buffers");
+
     const auto &descriptorPool =
         createDescriptorPool(logicalDevice, uniformBuffers.size());
     mainLogger.info("Created descriptor pool");
+
     const auto &descriptorSets =
         createDescriptorSets(logicalDevice, uniformBuffers, descriptorPool,
                              descriptorSetLayout, mainLogger);
+    mainLogger.info("Created descriptor sets");
+
     const auto &commandBuffer = commandPool.createCommandBuffer();
     mainLogger.info("Created command buffer");
+
     const auto &imageAvailableSemaphore = vki::Semaphore(logicalDevice);
     const auto &renderFinishedSemaphore = vki::Semaphore(logicalDevice);
-    const auto &inFlightFence = vki::Fence(logicalDevice);
+    const auto &inFlightFence = vki::Fence(logicalDevice, true);
     mainLogger.info("Created semaphores and fences");
+
     mainLogger.info("Entering main loop...");
     while (!window.shouldClose()) {
         controller.pollEvents();
@@ -720,8 +769,77 @@ vki::PhysicalDevice pickPhysicalDevice(const vki::VulkanInstance &instance,
 vki::QueueFamilyWithOp<1, vki::QueueOperationType::GRAPHIC,
                        vki::QueueOperationType::PRESENT>
 pickQueueFamily(const std::vector<vki::QueueFamily> &families) {
-    return &*std::ranges::find_if(families, [](const auto &family) -> bool {
+    return *std::ranges::find_if(families, [](const auto &family) -> bool {
         return queueFamilyFilter(family);
+    });
+};
+
+void updateFrameUniformBuffer(void *bufferMappedMemory,
+                              const VkExtent2D &swapchainExtent) {
+    static auto startTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(
+                     currentTime - startTime)
+                     .count();
+    UniformBufferObject ubo = {
+        .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),
+                             glm::vec3(0.0f, 0.0f, 1.0f)),
+        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                            glm::vec3(0.0f, 0.0f, 0.0f),
+                            glm::vec3(0.0f, 0.0f, 1.0f)),
+        .proj = glm::perspective(
+            glm::radians(45.0f),
+            swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f),
+    };
+    ubo.proj[1][1] *= -1;
+    memcpy(bufferMappedMemory, &ubo, sizeof(ubo));
+};
+
+void recordCommandBuffer(
+    const vki::Framebuffer &framebuffer, const vki::Swapchain &swapchain,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
+    const vki::GraphicsPipeline &pipeline,
+    const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
+    const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
+    const VkDescriptorSet &descriptorSet) {
+    commandBuffer.record([&]() {
+        VkClearValue clearColor = { .color = { .float32 = { 0.0f, 0.0f, 0.0f,
+                                                            1.0f } } };
+        vki::RenderPassBeginInfo renderPassBeginInfo = {
+            .renderPass = renderPass,
+            .framebuffer = framebuffer,
+            .clearValues = { clearColor },
+            .renderArea = { .offset = { 0, 0 }, .extent = swapchainExtent }
+        };
+        commandBuffer.withRenderPass(
+            renderPassBeginInfo, vki::SubpassContentsType::INLINE, [&]() {
+                commandBuffer.bindPipeline(
+                    pipeline, vki::PipelineBindPointType::GRAPHICS);
+                commandBuffer.bindVertexBuffers({
+                    .firstBinding = 0,
+                    .bindingCount = 1,
+                    .buffers = { vertexBuffer },
+                    .offsets = { 0 },
+                });
+                commandBuffer.bindIndexBuffer({
+                    .buffer = indexBuffer,
+                    .offset = 0,
+                    .type = VK_INDEX_TYPE_UINT16,
+                });
+                commandBuffer.bindDescriptorSet({
+                    .bindPointType = vki::PipelineBindPointType::GRAPHICS,
+                    .pipelineLayout = pipelineLayout,
+                    .firstSet = 0,
+                    .descriptorSets = { descriptorSet },
+                    .dynamicOffsets = {},
+                });
+                commandBuffer.drawIndexed(
+                    { .indexCount = static_cast<unsigned int>(indices.size()),
+                      .instanceCount = 1,
+                      .firstIndex = 0,
+                      .vertexOffset = 0,
+                      .firstInstance = 0 });
+            });
     });
 };
 
@@ -741,7 +859,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const std::vector<void *> &uniformMapped,
                const vki::PipelineLayout &pipelineLayout,
                const std::vector<VkDescriptorSet> &descriptorSets) {
-    inFlightFence.wait();
+    inFlightFence.waitAndReset();
 
     uint32_t imageIndex =
         swapchain.acquireNextImageKHR(imageAvailableSemaphore);
@@ -750,23 +868,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                         renderPass, pipeline, commandBuffer, vertexBuffer,
                         indexBuffer, pipelineLayout,
                         descriptorSets[imageIndex]);
-    static auto startTime = std::chrono::high_resolution_clock::now();
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(
-                     currentTime - startTime)
-                     .count();
-    UniformBufferObject ubo = {
-        .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),
-                             glm::vec3(0.0f, 0.0f, 1.0f)),
-        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                            glm::vec3(0.0f, 0.0f, 0.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f)),
-        .proj = glm::perspective(
-            glm::radians(45.0f),
-            swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f),
-    };
-    ubo.proj[1][1] *= -1;
-    memcpy(uniformMapped[imageIndex], &ubo, sizeof(ubo));
+    updateFrameUniformBuffer(uniformMapped[imageIndex], swapchainExtent);
     const vki::SubmitInfo submitInfo(
         { .waitSemaphores = { &imageAvailableSemaphore },
           .signalSemaphores = { &renderFinishedSemaphore },
@@ -779,52 +881,4 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
           .swapchains = { &swapchain },
           .imageIndices = { imageIndex } });
     presentQueue.present(presentInfo);
-};
-
-void recordCommandBuffer(
-    const vki::Framebuffer &framebuffer, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::GraphicsPipeline &pipeline,
-    const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
-    const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
-    const VkDescriptorSet &descriptorSet) {
-    commandBuffer.begin();
-
-    VkClearValue clearColor = { .color = {
-                                    .float32 = { 0.0f, 0.0f, 0.0f, 1.0f } } };
-    vki::RenderPassBeginInfo renderPassBeginInfo = {
-        .renderPass = renderPass,
-        .framebuffer = framebuffer,
-        .clearValues = { clearColor },
-        .renderArea = { .offset = { 0, 0 }, .extent = swapchainExtent }
-    };
-    commandBuffer.beginRenderPass(renderPassBeginInfo,
-                                  vki::SubpassContentsType::INLINE);
-    commandBuffer.bindPipeline(pipeline, vki::PipelineBindPointType::GRAPHICS);
-    commandBuffer.bindVertexBuffers({
-        .firstBinding = 0,
-        .bindingCount = 1,
-        .buffers = { vertexBuffer },
-        .offsets = { 0 },
-    });
-    commandBuffer.bindIndexBuffer({
-        .buffer = indexBuffer,
-        .offset = 0,
-        .type = VK_INDEX_TYPE_UINT16,
-    });
-    commandBuffer.bindDescriptorSet({
-        .bindPointType = vki::PipelineBindPointType::GRAPHICS,
-        .pipelineLayout = pipelineLayout,
-        .firstSet = 0,
-        .descriptorSets = { descriptorSet },
-        .dynamicOffsets = {},
-    });
-    commandBuffer.drawIndexed(
-        { .indexCount = static_cast<unsigned int>(indices.size()),
-          .instanceCount = 1,
-          .firstIndex = 0,
-          .vertexOffset = 0,
-          .firstInstance = 0 });
-    commandBuffer.endRenderPass();
-    commandBuffer.end();
 };

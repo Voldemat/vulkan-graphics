@@ -41,8 +41,8 @@ struct QueueFamily {
 
 template <unsigned int AvailableQueueCount, enum QueueOperationType... T>
 struct QueueFamilyWithOp {
-    const QueueFamily *family;
-    QueueFamilyWithOp(const QueueFamily *queueFamily)
+    const QueueFamily family;
+    QueueFamilyWithOp(const QueueFamily queueFamily)
         : family{ queueFamily } {};
 };
 };  // namespace vki

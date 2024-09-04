@@ -75,7 +75,7 @@ struct QueueCreateInfo {
         return (VkDeviceQueueCreateInfo){
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .flags = createFlags,
-            .queueFamilyIndex = queueFamily.family->index,
+            .queueFamilyIndex = queueFamily.family.index,
             .queueCount = queueCount,
             .pQueuePriorities = queuePriorities.data()
         };

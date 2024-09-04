@@ -22,7 +22,7 @@ public:
                                      vki::QueueOperationType::GRAPHIC, T...>
             &graphicQueueFamily)
         : device{ logicalDevice.getVkDevice() } {
-        init(graphicQueueFamily.family->index);
+        init(graphicQueueFamily.family.index);
     };
     const VkCommandPool getVkCommandPool() const;
     vki::CommandBuffer createCommandBuffer() const;

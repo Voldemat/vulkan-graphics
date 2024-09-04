@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <functional>
 #include <vector>
 
 #include "vulkan_app/vki/buffer.hpp"
@@ -43,7 +44,6 @@ struct DrawArgs {
     unsigned int firstVertex = 0;
     unsigned int firstInstance = 0;
 };
-
 
 struct DrawIndexedArgs {
     unsigned int indexCount;
@@ -100,6 +100,10 @@ public:
     void drawIndexed(const vki::DrawIndexedArgs &args) const;
     void bindVertexBuffers(const vki::BindVertexBuffersArgs &args) const;
     void bindIndexBuffer(const vki::BindIndexBufferArgs &args) const;
-    void bindDescriptorSet(const vki::BindDescriptorSetsArgs& args) const;
+    void bindDescriptorSet(const vki::BindDescriptorSetsArgs &args) const;
+    void record(const std::function<void()> &func) const;
+    void withRenderPass(const vki::RenderPassBeginInfo &renderPassBeginInfo,
+                        const vki::SubpassContentsType &subpassContentsType,
+                        const std::function<void()> &func) const;
 };
 };  // namespace vki
