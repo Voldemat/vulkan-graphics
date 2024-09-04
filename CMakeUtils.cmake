@@ -20,12 +20,16 @@ function(add_shaders TARGET_NAME)
     list(APPEND SHADER_COMMANDS "${SHADER_COMMAND}")
 
   endforeach()
-  add_custom_target(${TARGET_NAME} ALL
+  add_custom_command(
+    OUTPUT ${SHADER_PRODUCTS}
     ${SHADER_COMMANDS}
+    DEPENDS ${SHADER_SOURCE_FILES}
     COMMENT "Compiling Shaders [${TARGET_NAME}]"
-    SOURCES ${SHADER_SOURCE_FILES}
-    BYPRODUCTS ${SHADER_PRODUCTS}
   )
+  add_custom_target(
+      ${TARGET_NAME} ALL
+      DEPENDS ${SHADER_PRODUCTS}
+    )
   set(add_shaders_RETURN ${SHADER_PRODUCTS} PARENT_SCOPE)
 endfunction()
 
@@ -66,11 +70,15 @@ function(prepare_shaders TARGET_NAME)
     list(APPEND PREPARE_COMMANDS "${SHADER_COMMAND}")
 
   endforeach()
-  add_custom_target(${TARGET_NAME} ALL
-      ${PREPARE_COMMANDS}
+  add_custom_command(
+    OUTPUT ${PREPARE_PRODUCTS}
+    ${PREPARE_COMMANDS}
+    DEPENDS ${SPV_SHADER_FILES}
     COMMENT "Transforming shaders into object files [${TARGET_NAME}]"
-    SOURCES ${SPV_SHADER_FILES}
-    BYPRODUCTS ${PREPARE_PRODUCTS}
   )
+  add_custom_target(
+      ${TARGET_NAME} ALL
+      DEPENDS ${PREPARE_PRODUCTS}
+    )
   set(prepare_shaders_RETURN ${PREPARE_PRODUCTS} PARENT_SCOPE)
 endfunction()
