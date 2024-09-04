@@ -3,10 +3,9 @@ FetchContent_Declare(
     libjpeg
     GIT_REPOSITORY https://github.com/winlibs/libjpeg
     GIT_TAG libjpeg-turbo-2.1.0
+    CMAKE_ARGS -DENABLE_SHARED=OFF -D REQUIRE_SIMD=ON
 )
 FetchContent_MakeAvailable(libjpeg)
-set(ENABLE_SHARED OFF CACHE INTERNAL "DISABLE LIBJPEG SHARED LIBRARIES")
-set(REQUIRE_SIMD ON CACHE INTERNAL "REQUIRE LIBJPEG SIMD EXTENSION")
 set_target_properties(cjpeg-static PROPERTIES EXCLUDE_FROM_ALL 1)
 set_target_properties(tjunittest-static PROPERTIES EXCLUDE_FROM_ALL 1)
 set_target_properties(djpeg-static PROPERTIES EXCLUDE_FROM_ALL 1)

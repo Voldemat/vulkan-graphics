@@ -16,6 +16,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/easyloggingpp.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/magic_enum.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/libjpeg.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/libpng.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeUtils.cmake")
 file(GLOB_RECURSE GRAPHICS_HEADERS src/*.hpp src/*.h)
 file(GLOB_RECURSE GRAPHICS_SOURCES src/*.cpp src/*.c)
@@ -36,9 +37,16 @@ target_include_directories(
     PRIVATE ${EASYLOGGINGPP_INCLUDE_DIRECTORIES}
     PRIVATE ${Vulkan_INCLUDE_DIRS}
     PRIVATE ${turbojpeg_INCLUDE_DIRS}
+    PRIVATE ${png_static_INCLUDE_DIRS}
 )
 target_link_libraries(
     main
-    glfw Vulkan::Vulkan glm easyloggingpp magic_enum::magic_enum turbojpeg-static
+    glfw
+    Vulkan::Vulkan
+    glm
+    easyloggingpp
+    magic_enum::magic_enum
+    turbojpeg-static
+    png_static
     ${prepare_shaders_RETURN}
 )
