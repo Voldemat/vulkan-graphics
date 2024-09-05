@@ -10,6 +10,7 @@
 
 #include "./base.hpp"
 #include "./logical_device.hpp"
+#include "vulkan_app/vki/image_view.hpp"
 #include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/surface.hpp"
@@ -72,23 +73,22 @@ vki::Swapchain::Swapchain(const vki::LogicalDevice &logicalDevice,
         logicalDevice.getVkDevice(), &vkCreateInfo, nullptr, &vkSwapchain);
     assertSuccess(result, "vkCreateSwapchainKHR");
 
-    uint32_t swapChainImageCount;
+    uint32_t imagesCount;
     result = vkGetSwapchainImagesKHR(logicalDevice.getVkDevice(), vkSwapchain,
-                                     &swapChainImageCount, nullptr);
+                                     &imagesCount, nullptr);
     assertSuccess(result, "vkGetSwapchainImagesKHR");
-    swapChainImages.resize(swapChainImageCount);
-    result =
-        vkGetSwapchainImagesKHR(logicalDevice.getVkDevice(), vkSwapchain,
-                                &swapChainImageCount, swapChainImages.data());
+    std::vector<VkImage> images(imagesCount);
+    result = vkGetSwapchainImagesKHR(logicalDevice.getVkDevice(), vkSwapchain,
+                                     &imagesCount, images.data());
     assertSuccess(result, "vkGetSwapchainImagesKHR");
-    createImageViews(logicalDevice, vkCreateInfo.imageFormat);
+    createImageViews(logicalDevice, vkCreateInfo.imageFormat, images);
 };
 
 void vki::Swapchain::createImageViews(const vki::LogicalDevice &logicalDevice,
-                                      const VkFormat &format) {
-    swapChainImageViews.resize(swapChainImages.size());
-    int index = 0;
-    for (const auto &image : swapChainImages) {
+                                      const VkFormat &format,
+                                      const std::vector<VkImage> &images) {
+    swapChainImageViews.reserve(images.size());
+    for (const auto &image : images) {
         VkImageViewCreateInfo createInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image = image,
@@ -108,11 +108,8 @@ void vki::Swapchain::createImageViews(const vki::LogicalDevice &logicalDevice,
                 .layerCount = 1,
             },
         };
-        VkResult result =
-            vkCreateImageView(logicalDevice.getVkDevice(), &createInfo, nullptr,
-                              &swapChainImageViews[index]);
-        assertSuccess(result, "vkCreateImageView");
-        index++;
+        swapChainImageViews.emplace_back(
+            vki::ImageView(logicalDevice, createInfo));
     };
 };
 
@@ -129,9 +126,6 @@ uint32_t vki::Swapchain::acquireNextImageKHR(
 };
 
 vki::Swapchain::~Swapchain() {
-    for (const auto &imageView : swapChainImageViews) {
-        vkDestroyImageView(device, imageView, nullptr);
-    };
     vkDestroySwapchainKHR(device, vkSwapchain, nullptr);
 };
 

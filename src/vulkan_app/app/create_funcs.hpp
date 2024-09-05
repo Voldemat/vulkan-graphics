@@ -16,10 +16,13 @@
 #include "vulkan_app/vki/descriptor_set_layout.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
+#include "vulkan_app/vki/image.hpp"
+#include "vulkan_app/vki/image_view.hpp"
 #include "vulkan_app/vki/pipeline_layout.hpp"
 #include "vulkan_app/vki/queue.hpp"
 #include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
+#include "vulkan_app/vki/sampler.hpp"
 #include "vulkan_app/vki/surface.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 
@@ -36,7 +39,7 @@ std::vector<VkDescriptorSet> createDescriptorSets(
     const std::vector<vki::Buffer> &uniformBuffers,
     const vki::DescriptorPool &descriptorPool,
     const vki::DescriptorSetLayout &descriptorSetLayout,
-    const VkSampler &textureSampler, const VkImageView &textureImageView,
+    const vki::Sampler &textureSampler, const vki::ImageView &textureImageView,
     el::Logger &logger);
 
 vki::DescriptorPool createDescriptorPool(
@@ -61,11 +64,11 @@ vki::QueueFamilyWithOp<1, vki::QueueOperationType::GRAPHIC,
                        vki::QueueOperationType::PRESENT>
 pickQueueFamily(const std::vector<vki::QueueFamily> &families);
 
-VkSampler createTextureSampler(
+vki::Sampler createTextureSampler(
     const vki::LogicalDevice &logicalDevice,
     const VkPhysicalDeviceProperties &deviceProperties);
 
-std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
+std::tuple<vki::Image, vki::ImageView> createTextureImage(
     const vki::LogicalDevice &logicalDevice,
     const vki::CommandPool &commandPool,
     const VkPhysicalDeviceMemoryProperties &memoryProperties,

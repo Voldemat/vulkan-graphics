@@ -16,6 +16,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "easylogging++.h"
@@ -23,13 +24,14 @@
 #include "vulkan_app/app/create_buffers.hpp"
 #include "vulkan_app/app/image_loaders.hpp"
 #include "vulkan_app/app/uniform_buffer_object.hpp"
-#include "vulkan_app/vki/base.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_pool.hpp"
 #include "vulkan_app/vki/descriptor_pool.hpp"
 #include "vulkan_app/vki/descriptor_set_layout.hpp"
 #include "vulkan_app/vki/framebuffer.hpp"
 #include "vulkan_app/vki/graphics_pipeline.hpp"
+#include "vulkan_app/vki/image.hpp"
+#include "vulkan_app/vki/image_view.hpp"
 #include "vulkan_app/vki/instance.hpp"
 #include "vulkan_app/vki/logical_device.hpp"
 #include "vulkan_app/vki/memory.hpp"
@@ -37,6 +39,7 @@
 #include "vulkan_app/vki/queue.hpp"
 #include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/render_pass.hpp"
+#include "vulkan_app/vki/sampler.hpp"
 #include "vulkan_app/vki/shader_module.hpp"
 #include "vulkan_app/vki/structs.hpp"
 #include "vulkan_app/vki/surface.hpp"
@@ -73,7 +76,7 @@ std::vector<VkDescriptorSet> createDescriptorSets(
     const std::vector<vki::Buffer> &uniformBuffers,
     const vki::DescriptorPool &descriptorPool,
     const vki::DescriptorSetLayout &descriptorSetLayout,
-    const VkSampler &textureSampler, const VkImageView &textureImageView,
+    const vki::Sampler &textureSampler, const vki::ImageView &textureImageView,
     el::Logger &logger) {
     std::vector<VkDescriptorSetLayout> layouts(
         uniformBuffers.size(), descriptorSetLayout.getVkDescriptorSetLayout());
@@ -89,8 +92,8 @@ std::vector<VkDescriptorSet> createDescriptorSets(
     std::vector<VkDescriptorBufferInfo> bufferInfos(descriptorSets.size());
     std::vector<VkWriteDescriptorSet> writeInfos(descriptorSets.size() * 2);
     VkDescriptorImageInfo imageInfo = {
-        .sampler = textureSampler,
-        .imageView = textureImageView,
+        .sampler = textureSampler.getVkSampler(),
+        .imageView = textureImageView.getVkImageView(),
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
     for (size_t i = 0; i < descriptorSets.size(); i++) {
@@ -215,7 +218,7 @@ std::vector<vki::Framebuffer> createFramebuffers(
     return swapchain.swapChainImageViews |
            std::views::transform([&swapchain, &swapchainExtent, &renderPass,
                                   &logicalDevice](const auto &imageView) {
-               VkImageView attachments[] = { imageView };
+               VkImageView attachments[] = { imageView.getVkImageView() };
 
                VkFramebufferCreateInfo createInfo = {
                    .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -282,7 +285,7 @@ vki::PresentMode choosePresentMode(
     return vki::PresentMode::IMMEDIATE_KHR;
 };
 
-VkSampler createTextureSampler(
+vki::Sampler createTextureSampler(
     const vki::LogicalDevice &logicalDevice,
     const VkPhysicalDeviceProperties &deviceProperties) {
     VkSampler sampler;
@@ -305,12 +308,10 @@ VkSampler createTextureSampler(
         .maxLod = 0.0f,
 
     };
-    VkResult result = vkCreateSampler(logicalDevice.getVkDevice(),
-                                      &samplerCreateInfo, nullptr, &sampler);
-    vki::assertSuccess(result, "vkCreateSampler");
-    return sampler;
+    return vki::Sampler(logicalDevice, samplerCreateInfo);
 };
-std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
+
+std::tuple<vki::Image, vki::ImageView> createTextureImage(
     const vki::LogicalDevice &logicalDevice,
     const vki::CommandPool &commandPool,
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
@@ -335,26 +336,17 @@ std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
-    VkImage image;
-    VkResult result = vkCreateImage(logicalDevice.getVkDevice(), &createInfo,
-                                    nullptr, &image);
-    vki::assertSuccess(result, "vkCreateImage");
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(logicalDevice.getVkDevice(), image,
-                                 &memRequirements);
+    auto image = vki::Image(logicalDevice, createInfo);
+    const auto &imageMemoryRequirements = image.getMemoryRequirements();
     VkMemoryAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = memRequirements.size,
+        .allocationSize = imageMemoryRequirements.size,
         .memoryTypeIndex = vki::utils::findMemoryType(
-            memRequirements.memoryTypeBits, memoryProperties,
+            imageMemoryRequirements.memoryTypeBits, memoryProperties,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
     };
-    VkDeviceMemory memory;
-    result = vkAllocateMemory(logicalDevice.getVkDevice(), &allocInfo, nullptr,
-                              &memory);
-    vki::assertSuccess(result, "vkAllocateMemory");
-    result = vkBindImageMemory(logicalDevice.getVkDevice(), image, memory, 0);
-    vki::assertSuccess(result, "vkBindImageMemory");
+    image.bindMemory(vki::Memory(logicalDevice, allocInfo));
+
     VkImageMemoryBarrier firstBarrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = 0,
@@ -363,7 +355,7 @@ std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image,
+        .image = image.getVkImage(),
         .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                               .baseMipLevel = 0,
                               .levelCount = 1,
@@ -378,7 +370,7 @@ std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image,
+        .image = image.getVkImage(),
         .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                               .baseMipLevel = 0,
                               .levelCount = 1,
@@ -402,9 +394,10 @@ std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
                              nullptr, 1, &firstBarrier);
-        vkCmdCopyBufferToImage(
-            commandBuffer.getVkCommandBuffer(), stagingBuffer.getVkBuffer(),
-            image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(commandBuffer.getVkCommandBuffer(),
+                               stagingBuffer.getVkBuffer(), image.getVkImage(),
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                               &region);
         vkCmdPipelineBarrier(commandBuffer.getVkCommandBuffer(),
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
@@ -414,10 +407,9 @@ std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
                      .commandBuffers = { &commandBuffer } }) },
                  std::nullopt);
     queue.waitIdle();
-    VkImageView imageView;
     VkImageViewCreateInfo imageViewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = image,
+        .image = image.getVkImage(),
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = createInfo.format,
         .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -426,7 +418,6 @@ std::tuple<VkImage, VkImageView, VkDeviceMemory> createTextureImage(
                               .baseArrayLayer = 0,
                               .layerCount = 1 }
     };
-    result = vkCreateImageView(logicalDevice.getVkDevice(),
-                               &imageViewCreateInfo, nullptr, &imageView);
-    return { image, imageView, memory };
+    auto imageView = vki::ImageView(logicalDevice, imageViewCreateInfo);
+    return { std::move(image), std::move(imageView) };
 };

@@ -45,10 +45,18 @@
 #include "vulkan_app/vki/swapchain.hpp"
 
 const std::vector<Vertex> vertices = {
-    { .pos = { -0.5f, -0.5f }, .color = { 1.0f, 0.0f, 0.0f }, .texCoord = { 1.0f, 0.0f } },
-    { .pos = { 0.5f, -0.5f }, .color = { 1.0f, 1.0f, 0.0f }, .texCoord = { 0.0f, 0.0f } },
-    { .pos = { 0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f }, .texCoord = { 0.0f, 1.0f } },
-    { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f }, .texCoord = { 1.0f, 1.0f } },
+    { .pos = { -0.5f, -0.5f },
+      .color = { 1.0f, 0.0f, 0.0f },
+      .texCoord = { 1.0f, 0.0f } },
+    { .pos = { 0.5f, -0.5f },
+      .color = { 1.0f, 1.0f, 0.0f },
+      .texCoord = { 0.0f, 0.0f } },
+    { .pos = { 0.5f, 0.5f },
+      .color = { 0.0f, 0.0f, 1.0f },
+      .texCoord = { 0.0f, 1.0f } },
+    { .pos = { -0.5f, 0.5f },
+      .color = { 0.0f, 0.0f, 1.0f },
+      .texCoord = { 1.0f, 1.0f } },
 };
 
 const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0 };
@@ -175,9 +183,8 @@ void run_app() {
         createDescriptorPool(logicalDevice, uniformBuffers.size());
     mainLogger.info("Created descriptor pool");
 
-    const auto &[textureImage, textureImageView, textureMemory] =
-        createTextureImage(logicalDevice, commandPool, memoryProperties,
-                           mainLogger, queue);
+    const auto &[textureImage, textureImageView] = createTextureImage(
+        logicalDevice, commandPool, memoryProperties, mainLogger, queue);
     const auto &textureSampler =
         createTextureSampler(logicalDevice, physicalDevice.getProperties());
 
@@ -206,8 +213,4 @@ void run_app() {
 
     mainLogger.info("Waiting for queued operations to complete...");
     logicalDevice.waitIdle();
-    vkDestroySampler(logicalDevice.getVkDevice(), textureSampler, nullptr);
-    vkDestroyImageView(logicalDevice.getVkDevice(), textureImageView, nullptr);
-    vkDestroyImage(logicalDevice.getVkDevice(), textureImage, nullptr);
-    vkFreeMemory(logicalDevice.getVkDevice(), textureMemory, nullptr);
 };

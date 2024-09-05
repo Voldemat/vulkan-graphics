@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "vulkan_app/vki/image_view.hpp"
 #include "vulkan_app/vki/queue_family.hpp"
 #include "vulkan_app/vki/semaphore.hpp"
 #include "vulkan_app/vki/surface.hpp"
@@ -50,9 +51,8 @@ VkImageUsageFlags imageUsageToVk(
 
 struct SwapchainSharingInfo {
     std::optional<std::vector<unsigned int>> queueIndices;
-    explicit SwapchainSharingInfo(
-        const vki::QueueFamily& graphicsQueueFamily,
-        const vki::QueueFamily& presentQueueFamily);
+    explicit SwapchainSharingInfo(const vki::QueueFamily &graphicsQueueFamily,
+                                  const vki::QueueFamily &presentQueueFamily);
 };
 
 struct SwapchainCreateInfo {
@@ -76,11 +76,11 @@ class Swapchain {
     const VkDevice device;
     VkSwapchainKHR vkSwapchain;
     void createImageViews(const vki::LogicalDevice &logicalDevice,
-                          const VkFormat &format);
+                          const VkFormat &format,
+                          const std::vector<VkImage> &images);
 
 public:
-    std::vector<VkImage> swapChainImages;
-    std::vector<VkImageView> swapChainImageViews;
+    std::vector<vki::ImageView> swapChainImageViews;
     explicit Swapchain(const vki::LogicalDevice &logicalDevice,
                        const vki::SwapchainCreateInfo &createInfo);
     const VkSwapchainKHR getVkSwapchain() const;
