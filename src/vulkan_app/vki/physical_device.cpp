@@ -128,3 +128,10 @@ std::vector<vki::QueueFamily> vki::PhysicalDevice::getQueueFamilies() const {
     return queueFamilies;
 };
 
+
+VkPhysicalDeviceFeatures vki::PhysicalDevice::getFeatures() const {
+    VkPhysicalDeviceFeatures features;
+    vkGetPhysicalDeviceFeatures(device, &features);
+    return features;
+};
+

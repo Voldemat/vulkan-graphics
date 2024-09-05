@@ -9,18 +9,17 @@
 
 void vki::LogicalDevice::init(
     const vki::PhysicalDevice &physicalDevice,
+    const VkPhysicalDeviceFeatures& features,
     const std::vector<VkDeviceQueueCreateInfo> &queueCreateInfoArray) {
     std::vector<const char *> deviceExtensions;
     deviceExtensions.push_back("VK_KHR_portability_subset");
     deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = queueCreateInfoArray.size();
     createInfo.pQueueCreateInfos = queueCreateInfoArray.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.pEnabledFeatures = &features;
     createInfo.enabledExtensionCount = deviceExtensions.size();
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 

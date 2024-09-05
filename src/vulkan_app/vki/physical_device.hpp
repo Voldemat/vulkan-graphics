@@ -32,6 +32,7 @@ public:
             &funcs) const;
 
     VkPhysicalDeviceMemoryProperties getMemoryProperties() const;
+    VkPhysicalDeviceFeatures getFeatures() const;
 
     PRINTABLE_DEFINITIONS(PhysicalDevice)
 };

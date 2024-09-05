@@ -15,11 +15,14 @@ class LogicalDevice {
     VkDevice device;
     LogicalDevice(const LogicalDevice &other) = delete;
     void init(const vki::PhysicalDevice &physicalDevice,
+              const VkPhysicalDeviceFeatures &features,
               const std::vector<VkDeviceQueueCreateInfo> &queueCreateInfoArray);
 
 public:
     template <typename... T>
     explicit LogicalDevice(const vki::PhysicalDevice &physicalDevice,
+
+                           const VkPhysicalDeviceFeatures &features,
                            const std::tuple<T...> &queueInfoArray) {
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfoArray;
         std::apply(
@@ -27,7 +30,7 @@ public:
                 ((queueCreateInfoArray.push_back(args.getVkCreateInfo()), ...));
             },
             queueInfoArray);
-        init(physicalDevice, queueCreateInfoArray);
+        init(physicalDevice, features, queueCreateInfoArray);
     };
 
     template <unsigned int QueueIndex, unsigned int QueueCount,

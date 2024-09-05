@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <tuple>
 #include <vector>
@@ -12,6 +13,10 @@
 #include "vulkan_app/vki/command_pool.hpp"
 #include "vulkan_app/vki/queue.hpp"
 
+vki::Buffer createStagingBuffer(
+    const vki::LogicalDevice &logicalDevice,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const std::size_t &size, void *data);
 std::tuple<vki::Buffer, vki::Buffer> createVertexAndIndicesBuffer(
     const vki::LogicalDevice &logicalDevice,
     const VkPhysicalDeviceMemoryProperties &memoryProperties,

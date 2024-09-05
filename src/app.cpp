@@ -45,10 +45,10 @@
 #include "vulkan_app/vki/swapchain.hpp"
 
 const std::vector<Vertex> vertices = {
-    { .pos = { -0.5f, -0.5f }, .color = { 1.0f, 0.0f, 0.0f } },
-    { .pos = { 0.5f, -0.5f }, .color = { 1.0f, 1.0f, 0.0f } },
-    { .pos = { 0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f } },
-    { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f } },
+    { .pos = { -0.5f, -0.5f }, .color = { 1.0f, 0.0f, 0.0f }, .texCoord = { 1.0f, 0.0f } },
+    { .pos = { 0.5f, -0.5f }, .color = { 1.0f, 1.0f, 0.0f }, .texCoord = { 0.0f, 0.0f } },
+    { .pos = { 0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f }, .texCoord = { 0.0f, 1.0f } },
+    { .pos = { -0.5f, 0.5f }, .color = { 0.0f, 0.0f, 1.0f }, .texCoord = { 1.0f, 1.0f } },
 };
 
 const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0 };
@@ -92,7 +92,8 @@ void run_app() {
         vki::QueueCreateInfo<1, 1, vki::QueueOperationType::GRAPHIC,
                              vki::QueueOperationType::PRESENT>(queueFamily);
     const vki::LogicalDevice logicalDevice =
-        vki::LogicalDevice(physicalDevice, std::make_tuple(queueCreateInfo));
+        vki::LogicalDevice(physicalDevice, physicalDevice.getFeatures(),
+                           std::make_tuple(queueCreateInfo));
     mainLogger.info("Created logical device");
     const auto &queue = logicalDevice.getQueue<0>(queueCreateInfo);
 
@@ -174,9 +175,15 @@ void run_app() {
         createDescriptorPool(logicalDevice, uniformBuffers.size());
     mainLogger.info("Created descriptor pool");
 
-    const auto &descriptorSets =
-        createDescriptorSets(logicalDevice, uniformBuffers, descriptorPool,
-                             descriptorSetLayout, mainLogger);
+    const auto &[textureImage, textureImageView, textureMemory] =
+        createTextureImage(logicalDevice, commandPool, memoryProperties,
+                           mainLogger, queue);
+    const auto &textureSampler =
+        createTextureSampler(logicalDevice, physicalDevice.getProperties());
+
+    const auto &descriptorSets = createDescriptorSets(
+        logicalDevice, uniformBuffers, descriptorPool, descriptorSetLayout,
+        textureSampler, textureImageView, mainLogger);
     mainLogger.info("Created descriptor sets");
 
     const auto &commandBuffer = commandPool.createCommandBuffer();
@@ -199,4 +206,8 @@ void run_app() {
 
     mainLogger.info("Waiting for queued operations to complete...");
     logicalDevice.waitIdle();
+    vkDestroySampler(logicalDevice.getVkDevice(), textureSampler, nullptr);
+    vkDestroyImageView(logicalDevice.getVkDevice(), textureImageView, nullptr);
+    vkDestroyImage(logicalDevice.getVkDevice(), textureImage, nullptr);
+    vkFreeMemory(logicalDevice.getVkDevice(), textureMemory, nullptr);
 };
