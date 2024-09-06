@@ -9,7 +9,7 @@
 #include "glm/ext/vector_float3.hpp"
 
 struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 texCoord;
 
@@ -25,7 +25,7 @@ struct Vertex {
             (VkVertexInputAttributeDescription){
                 .location = 0,
                 .binding = 0,
-                .format = VK_FORMAT_R32G32_SFLOAT,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
                 .offset = offsetof(Vertex, pos) },
             (VkVertexInputAttributeDescription){
                 .location = 1,

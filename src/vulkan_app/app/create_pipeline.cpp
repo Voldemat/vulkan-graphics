@@ -118,6 +118,19 @@ vki::GraphicsPipeline createGraphicsPipeline(
         .pAttachments = &colorBlendAttachment,
     };
 
+    VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = VK_FALSE,
+        .minDepthBounds = 0,
+        .maxDepthBounds = 1.0f,
+        .stencilTestEnable = VK_FALSE,
+        .front = {},
+        .back = {}
+    };
+
     VkGraphicsPipelineCreateInfo pipelineInfo = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .stageCount = 2,
@@ -127,6 +140,7 @@ vki::GraphicsPipeline createGraphicsPipeline(
         .pViewportState = &viewportCreateInfo,
         .pRasterizationState = &rasterizer,
         .pMultisampleState = &multisample,
+        .pDepthStencilState = &depthStencilCreateInfo,
         .pColorBlendState = &colorBlending,
         .layout = pipelineLayout.getVkPipelineLayout(),
         .renderPass = renderPass.getVkRenderPass(),

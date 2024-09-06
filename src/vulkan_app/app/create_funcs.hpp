@@ -47,14 +47,16 @@ vki::DescriptorPool createDescriptorPool(
     const uint32_t &uniformBuffersCount);
 
 vki::RenderPass createRenderPass(const vki::LogicalDevice &logicalDevice,
-                                 const VkFormat &swapchainFormat);
+                                 const VkFormat &swapchainFormat,
+                                 const VkFormat &depthFormat);
 
 vki::DescriptorSetLayout createDescriptorSetLayout(
     const vki::LogicalDevice &logicalDevice);
 
 std::vector<vki::Framebuffer> createFramebuffers(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
-    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass);
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
+    const vki::ImageView &depthImageView);
 
 vki::PhysicalDevice pickPhysicalDevice(const vki::VulkanInstance &instance,
                                        const vki::Surface &surface,
@@ -73,3 +75,12 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
     const vki::CommandPool &commandPool,
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
     el::Logger &logger, const vki::GraphicsQueueMixin &queue);
+
+std::tuple<vki::Image, vki::ImageView> createDepthImage(
+    const vki::LogicalDevice &logicalDevice,
+    const vki::CommandPool &commandPool, const VkFormat &depthFormat,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    const VkExtent2D &swapchainExtent, el::Logger &logger,
+    const vki::GraphicsQueueMixin &queue);
+
+VkFormat findDepthFormat(const vki::PhysicalDevice &physicalDevice);

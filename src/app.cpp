@@ -44,22 +44,33 @@
 #include "vulkan_app/vki/surface.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 
-const std::vector<Vertex> vertices = {
-    { .pos = { -0.5f, -0.5f },
-      .color = { 1.0f, 0.0f, 0.0f },
-      .texCoord = { 1.0f, 0.0f } },
-    { .pos = { 0.5f, -0.5f },
-      .color = { 1.0f, 1.0f, 0.0f },
-      .texCoord = { 0.0f, 0.0f } },
-    { .pos = { 0.5f, 0.5f },
-      .color = { 0.0f, 0.0f, 1.0f },
-      .texCoord = { 0.0f, 1.0f } },
-    { .pos = { -0.5f, 0.5f },
-      .color = { 0.0f, 0.0f, 1.0f },
-      .texCoord = { 1.0f, 1.0f } },
-};
+const std::vector<Vertex> vertices = { { .pos = { -0.5f, -0.5f, 0.0f },
+                                         .color = { 1.0f, 0.0f, 0.0f },
+                                         .texCoord = { 1.0f, 0.0f } },
+                                       { .pos = { 0.5f, -0.5f, 0.0f },
+                                         .color = { 1.0f, 1.0f, 0.0f },
+                                         .texCoord = { 0.0f, 0.0f } },
+                                       { .pos = { 0.5f, 0.5f, 0.0f },
+                                         .color = { 0.0f, 0.0f, 1.0f },
+                                         .texCoord = { 0.0f, 1.0f } },
+                                       { .pos = { -0.5f, 0.5f, 0.0f },
+                                         .color = { 0.0f, 0.0f, 1.0f },
+                                         .texCoord = { 1.0f, 1.0f } },
 
-const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0 };
+                                       { .pos = { -0.5f, -0.5f, -0.5f },
+                                         .color = { 1.0f, 0.0f, 0.0f },
+                                         .texCoord = { 0.0f, 0.0f } },
+                                       { .pos = { 0.5f, -0.5f, -0.5f },
+                                         .color = { 0.0f, 1.0f, 0.0f },
+                                         .texCoord = { 1.0f, 0.0f } },
+                                       { .pos = { 0.5f, 0.5f, -0.5f },
+                                         .color = { 0.0f, 0.0f, 1.0f },
+                                         .texCoord = { 1.0f, 1.0f } },
+                                       { .pos = { -0.5f, 0.5f, -0.5f },
+                                         .color = { 1.0f, 1.0f, 1.0f },
+                                         .texCoord = { 0.0f, 1.0f } } };
+
+const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 };
 
 void run_app() {
     auto &mainLogger = *el::Loggers::getLogger("main");
@@ -147,8 +158,9 @@ void run_app() {
                                                    queueFamily.family) });
     mainLogger.info("Created swapchain");
 
+    const auto &depthFormat = findDepthFormat(physicalDevice);
     const auto &renderPass =
-        createRenderPass(logicalDevice, swapchainFormat.format);
+        createRenderPass(logicalDevice, swapchainFormat.format, depthFormat);
     mainLogger.info("Created render pass");
 
     const auto &descriptorSetLayout = createDescriptorSetLayout(logicalDevice);
@@ -162,14 +174,19 @@ void run_app() {
         logicalDevice, mainLogger, swapchainExtent, renderPass, pipelineLayout);
     mainLogger.info("Created pipeline");
 
-    const auto &framebuffers = createFramebuffers(logicalDevice, swapchain,
-                                                  swapchainExtent, renderPass);
-    mainLogger.info("Created framebuffers");
-
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
     mainLogger.info("Created command pool");
 
     const auto &memoryProperties = physicalDevice.getMemoryProperties();
+
+    const auto &[depthImage, depthImageView] =
+        createDepthImage(logicalDevice, commandPool, depthFormat,
+                         memoryProperties, swapchainExtent, mainLogger, queue);
+
+    const auto &framebuffers = createFramebuffers(
+        logicalDevice, swapchain, swapchainExtent, renderPass, depthImageView);
+    mainLogger.info("Created framebuffers");
+
     const auto &[vertexBuffer, indexBuffer] = createVertexAndIndicesBuffer(
         logicalDevice, memoryProperties, mainLogger, commandPool, queue,
         vertices, indices);

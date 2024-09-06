@@ -57,10 +57,11 @@ void recordCommandBuffer(
     commandBuffer.record([&]() {
         VkClearValue clearColor = { .color = { .float32 = { 0.0f, 0.0f, 0.0f,
                                                             1.0f } } };
+        VkClearValue clearDepth = { .depthStencil = { 1.0f, 0 } };
         vki::RenderPassBeginInfo renderPassBeginInfo = {
             .renderPass = renderPass,
             .framebuffer = framebuffer,
-            .clearValues = { clearColor },
+            .clearValues = { clearColor, clearDepth },
             .renderArea = { .offset = { 0, 0 }, .extent = swapchainExtent }
         };
         commandBuffer.withRenderPass(
@@ -110,7 +111,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const std::vector<void *> &uniformMapped,
                const vki::PipelineLayout &pipelineLayout,
                const std::vector<VkDescriptorSet> &descriptorSets,
-               const uint32_t& indicesSize) {
+               const uint32_t &indicesSize) {
     inFlightFence.waitAndReset();
 
     uint32_t imageIndex =
@@ -118,8 +119,8 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
     commandBuffer.reset();
     recordCommandBuffer(framebuffers[imageIndex], swapchain, swapchainExtent,
                         renderPass, pipeline, commandBuffer, vertexBuffer,
-                        indexBuffer, pipelineLayout,
-                        descriptorSets[imageIndex], indicesSize);
+                        indexBuffer, pipelineLayout, descriptorSets[imageIndex],
+                        indicesSize);
     updateFrameUniformBuffer(uniformMapped[imageIndex], swapchainExtent);
     const vki::SubmitInfo submitInfo(
         { .waitSemaphores = { &imageAvailableSemaphore },
