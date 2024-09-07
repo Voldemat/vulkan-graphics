@@ -159,8 +159,9 @@ void run_app() {
     mainLogger.info("Created swapchain");
 
     const auto &depthFormat = findDepthFormat(physicalDevice);
-    const auto &renderPass =
-        createRenderPass(logicalDevice, swapchainFormat.format, depthFormat);
+    const auto &sampleCount = getMaxUsableSampleCount(physicalDevice);
+    const auto &renderPass = createRenderPass(
+        logicalDevice, swapchainFormat.format, depthFormat, sampleCount);
     mainLogger.info("Created render pass");
 
     const auto &descriptorSetLayout = createDescriptorSetLayout(logicalDevice);
@@ -171,7 +172,7 @@ void run_app() {
     mainLogger.info("Created pipeline layout");
 
     const auto &pipeline = createGraphicsPipeline(
-        logicalDevice, mainLogger, swapchainExtent, renderPass, pipelineLayout);
+        logicalDevice, mainLogger, swapchainExtent, renderPass, pipelineLayout, sampleCount);
     mainLogger.info("Created pipeline");
 
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
@@ -179,12 +180,17 @@ void run_app() {
 
     const auto &memoryProperties = physicalDevice.getMemoryProperties();
 
+    const auto &[multisampleImage, multisampleImageView] =
+        createMultisampleImage(logicalDevice, swapchainFormat.format,
+                               swapchainExtent, sampleCount, memoryProperties,
+                               mainLogger, queue);
     const auto &[depthImage, depthImageView] =
-        createDepthImage(logicalDevice, commandPool, depthFormat,
+        createDepthImage(logicalDevice, commandPool, depthFormat, sampleCount,
                          memoryProperties, swapchainExtent, mainLogger, queue);
 
-    const auto &framebuffers = createFramebuffers(
-        logicalDevice, swapchain, swapchainExtent, renderPass, depthImageView);
+    const auto &framebuffers =
+        createFramebuffers(logicalDevice, swapchain, swapchainExtent,
+                           renderPass, depthImageView, multisampleImageView);
     mainLogger.info("Created framebuffers");
 
     const auto &[vertexBuffer, indexBuffer] = createVertexAndIndicesBuffer(

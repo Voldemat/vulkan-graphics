@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -155,16 +156,17 @@ vki::DescriptorPool createDescriptorPool(
 
 vki::RenderPass createRenderPass(const vki::LogicalDevice &logicalDevice,
                                  const VkFormat &swapchainFormat,
-                                 const VkFormat &depthFormat) {
+                                 const VkFormat &depthFormat,
+                                 const VkSampleCountFlagBits &sampleCount) {
     VkAttachmentDescription colorAttachment = {
         .format = swapchainFormat,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .samples = sampleCount,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
     VkAttachmentReference colorAttachmentRef = {
         .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
@@ -172,7 +174,7 @@ vki::RenderPass createRenderPass(const vki::LogicalDevice &logicalDevice,
 
     VkAttachmentDescription depthAttachment = {
         .format = depthFormat,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .samples = sampleCount,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -184,12 +186,27 @@ vki::RenderPass createRenderPass(const vki::LogicalDevice &logicalDevice,
         .attachment = 1,
         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
     };
-    VkSubpassDescription subpass = { .pipelineBindPoint =
-                                         VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                     .colorAttachmentCount = 1,
-                                     .pColorAttachments = &colorAttachmentRef,
-                                     .pDepthStencilAttachment =
-                                         &depthAttachmentRef };
+
+    VkAttachmentDescription resolveAttachment = {
+        .format = swapchainFormat,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+    };
+    VkAttachmentReference resolveAttachmentRef = {
+        .attachment = 2, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+    };
+    VkSubpassDescription subpass = {
+        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colorAttachmentRef,
+        .pResolveAttachments = &resolveAttachmentRef,
+        .pDepthStencilAttachment = &depthAttachmentRef
+    };
     VkSubpassDependency dependency = {
         .srcSubpass = VK_SUBPASS_EXTERNAL,
         .dstSubpass = 0,
@@ -197,12 +214,13 @@ vki::RenderPass createRenderPass(const vki::LogicalDevice &logicalDevice,
                         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
                         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
     const vki::RenderPassCreateInfo renderPassCreateInfo = {
-        .attachments = { colorAttachment, depthAttachment },
+        .attachments = { colorAttachment, depthAttachment, resolveAttachment },
         .subpasses = { subpass },
         .dependencies = { dependency },
     };
@@ -237,25 +255,29 @@ vki::DescriptorSetLayout createDescriptorSetLayout(
 std::vector<vki::Framebuffer> createFramebuffers(
     const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
     const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::ImageView &depthImageView) {
+    const vki::ImageView &depthImageView,
+    const vki::ImageView &multisampleImageView) {
     return swapchain.swapChainImageViews |
-           std::views::transform([&swapchain, &swapchainExtent, &renderPass,
-                                  &logicalDevice,
-                                  &depthImageView](const auto &imageView) {
-               std::array attachments = { imageView.getVkImageView(),
-                                          depthImageView.getVkImageView() };
+           std::views::transform(
+               [&swapchain, &swapchainExtent, &renderPass, &logicalDevice,
+                &depthImageView, &multisampleImageView](const auto &imageView) {
+                   std::array attachments = {
+                       multisampleImageView.getVkImageView(),
+                       depthImageView.getVkImageView(),
+                       imageView.getVkImageView(),
+                   };
 
-               VkFramebufferCreateInfo createInfo = {
-                   .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                   .renderPass = renderPass.getVkRenderPass(),
-                   .attachmentCount = attachments.size(),
-                   .pAttachments = attachments.data(),
-                   .width = swapchainExtent.width,
-                   .height = swapchainExtent.height,
-                   .layers = 1,
-               };
-               return vki::Framebuffer(logicalDevice, createInfo);
-           }) |
+                   VkFramebufferCreateInfo createInfo = {
+                       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                       .renderPass = renderPass.getVkRenderPass(),
+                       .attachmentCount = attachments.size(),
+                       .pAttachments = attachments.data(),
+                       .width = swapchainExtent.width,
+                       .height = swapchainExtent.height,
+                       .layers = 1,
+                   };
+                   return vki::Framebuffer(logicalDevice, createInfo);
+               }) |
            std::ranges::to<std::vector>();
 };
 
@@ -330,7 +352,7 @@ vki::Sampler createTextureSampler(
         .compareEnable = VK_FALSE,
         .compareOp = VK_COMPARE_OP_ALWAYS,
         .minLod = 0.0f,
-        .maxLod = 0.0f,
+        .maxLod = VK_LOD_CLAMP_NONE,
 
     };
     return vki::Sampler(logicalDevice, samplerCreateInfo);
@@ -342,6 +364,9 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
     el::Logger &logger, const vki::GraphicsQueueMixin &queue) {
     const auto &imageData = load_jpeg_image(std::filesystem::path("check.jpg"));
+    const auto &mipLevels = static_cast<uint32_t>(std::floor(std::log2(
+                                std::max(imageData.width, imageData.height)))) +
+                            1;
     VkDeviceSize size = imageData.width * imageData.height * 4;
     const auto &stagingBuffer = createStagingBuffer(
         logicalDevice, memoryProperties, logger, size, imageData.buffer);
@@ -353,11 +378,12 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
         .extent = { .width = imageData.width,
                     .height = imageData.height,
                     .depth = 1 },
-        .mipLevels = 1,
+        .mipLevels = mipLevels,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
@@ -372,7 +398,7 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
     };
     image.bindMemory(vki::Memory(logicalDevice, allocInfo));
 
-    VkImageMemoryBarrier firstBarrier = {
+    VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = 0,
         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -383,25 +409,11 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
         .image = image.getVkImage(),
         .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                               .baseMipLevel = 0,
-                              .levelCount = 1,
+                              .levelCount = mipLevels,
                               .baseArrayLayer = 0,
                               .layerCount = 1 }
     };
-    VkImageMemoryBarrier secondBarrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image.getVkImage(),
-        .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                              .baseMipLevel = 0,
-                              .levelCount = 1,
-                              .baseArrayLayer = 0,
-                              .layerCount = 1 }
-    };
+
     const auto &commandBuffer = commandPool.createCommandBuffer();
     VkBufferImageCopy region = {
         .bufferOffset = 0,
@@ -414,24 +426,79 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
         .imageOffset = { 0, 0, 0 },
         .imageExtent = createInfo.extent
     };
+
+    int32_t mipWidth = imageData.width;
+    int32_t mipHeight = imageData.height;
+    const auto &submitInfo = vki::SubmitInfo(
+        (vki::SubmitInfoInputData){ .commandBuffers = { &commandBuffer } });
     commandBuffer.record([&]() {
         vkCmdPipelineBarrier(commandBuffer.getVkCommandBuffer(),
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                             nullptr, 1, &firstBarrier);
+                             nullptr, 1, &barrier);
         vkCmdCopyBufferToImage(commandBuffer.getVkCommandBuffer(),
                                stagingBuffer.getVkBuffer(), image.getVkImage(),
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                                &region);
+        barrier.subresourceRange.levelCount = 1;
+        for (uint32_t i = 1; i < mipLevels; i++) {
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            vkCmdPipelineBarrier(commandBuffer.getVkCommandBuffer(),
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+                                 0, nullptr, 1, &barrier);
+            VkImageBlit blit = {
+                .srcSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                    .mipLevel = i - 1,
+                                    .baseArrayLayer = 0,
+                                    .layerCount = 1 },
+                .srcOffsets = { { 0, 0, 0 },
+                                { .x = mipWidth, .y = mipHeight, .z = 1 } },
+                .dstSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                    .mipLevel = i,
+                                    .baseArrayLayer = 0,
+                                    .layerCount = 1 },
+                .dstOffsets = { { 0, 0, 0 },
+                                { .x = mipWidth > 1 ? (mipWidth / 2) : 1,
+                                  .y = mipHeight > 1 ? (mipHeight / 2) : 1,
+                                  .z = 1 } }
+            };
+            vkCmdBlitImage(
+                commandBuffer.getVkCommandBuffer(), image.getVkImage(),
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image.getVkImage(),
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
+                VK_FILTER_LINEAR);
+
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(commandBuffer.getVkCommandBuffer(),
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &barrier);
+
+            if (mipWidth > 1) mipWidth /= 2;
+            if (mipHeight > 1) mipHeight /= 2;
+        };
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.subresourceRange.baseMipLevel = mipLevels - 1;
         vkCmdPipelineBarrier(commandBuffer.getVkCommandBuffer(),
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
-                             nullptr, 0, nullptr, 1, &secondBarrier);
+                             nullptr, 0, nullptr, 1, &barrier);
     });
-    queue.submit({ vki::SubmitInfo((vki::SubmitInfoInputData){
-                     .commandBuffers = { &commandBuffer } }) },
-                 std::nullopt);
+
+    queue.submit({ submitInfo }, std::nullopt);
     queue.waitIdle();
+
     VkImageViewCreateInfo imageViewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image.getVkImage(),
@@ -439,7 +506,7 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
         .format = createInfo.format,
         .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                               .baseMipLevel = 0,
-                              .levelCount = 1,
+                              .levelCount = mipLevels,
                               .baseArrayLayer = 0,
                               .layerCount = 1 }
     };
@@ -450,6 +517,7 @@ std::tuple<vki::Image, vki::ImageView> createTextureImage(
 std::tuple<vki::Image, vki::ImageView> createDepthImage(
     const vki::LogicalDevice &logicalDevice,
     const vki::CommandPool &commandPool, const VkFormat &depthFormat,
+    const VkSampleCountFlagBits &sampleCount,
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
     const VkExtent2D &swapchainExtent, el::Logger &logger,
     const vki::GraphicsQueueMixin &queue) {
@@ -463,7 +531,7 @@ std::tuple<vki::Image, vki::ImageView> createDepthImage(
                     .depth = 1 },
         .mipLevels = 1,
         .arrayLayers = 1,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .samples = sampleCount,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -510,4 +578,79 @@ VkFormat findDepthFormat(const vki::PhysicalDevice &physicalDevice) {
         };
     };
     throw std::runtime_error("No format was found for depth attachment");
+};
+
+VkSampleCountFlagBits getMaxUsableSampleCount(
+    const vki::PhysicalDevice &physicalDevice) {
+    const auto &limits = physicalDevice.properties.limits;
+    VkSampleCountFlags counts = limits.framebufferColorSampleCounts &
+                                limits.framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_64_BIT) {
+        return VK_SAMPLE_COUNT_64_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_32_BIT) {
+        return VK_SAMPLE_COUNT_32_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_16_BIT) {
+        return VK_SAMPLE_COUNT_16_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_8_BIT) {
+        return VK_SAMPLE_COUNT_8_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_4_BIT) {
+        return VK_SAMPLE_COUNT_4_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_2_BIT) {
+        return VK_SAMPLE_COUNT_2_BIT;
+    }
+
+    return VK_SAMPLE_COUNT_1_BIT;
+};
+
+std::tuple<vki::Image, vki::ImageView> createMultisampleImage(
+    const vki::LogicalDevice &logicalDevice, const VkFormat &swapchainFormat,
+    const VkExtent2D &swapchainExtent, const VkSampleCountFlagBits &sampleCount,
+    const VkPhysicalDeviceMemoryProperties &memoryProperties,
+    el::Logger &logger, const vki::GraphicsQueueMixin &queue) {
+    VkImageCreateInfo imageCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .flags = 0,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = swapchainFormat,
+        .extent = { .width = swapchainExtent.width,
+                    .height = swapchainExtent.height,
+                    .depth = 1 },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = sampleCount,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+
+    auto image = vki::Image(logicalDevice, imageCreateInfo);
+    const auto &imageMemoryRequirements = image.getMemoryRequirements();
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = imageMemoryRequirements.size,
+        .memoryTypeIndex = vki::utils::findMemoryType(
+            imageMemoryRequirements.memoryTypeBits, memoryProperties,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+    };
+    image.bindMemory(vki::Memory(logicalDevice, allocInfo));
+    VkImageViewCreateInfo imageViewCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = image.getVkImage(),
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = imageCreateInfo.format,
+        .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    auto imageView = vki::ImageView(logicalDevice, imageViewCreateInfo);
+    return { std::move(image), std::move(imageView) };
 };

@@ -16,4 +16,5 @@ vki::PipelineLayout createPipelineLayout(
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, el::Logger &logger,
     VkExtent2D swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::PipelineLayout &pipelineLayout);
+    const vki::PipelineLayout &pipelineLayout,
+    const VkSampleCountFlagBits &sampleCount);

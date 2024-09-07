@@ -27,7 +27,8 @@ vki::PipelineLayout createPipelineLayout(
 vki::GraphicsPipeline createGraphicsPipeline(
     const vki::LogicalDevice &logicalDevice, el::Logger &logger,
     VkExtent2D swapchainExtent, const vki::RenderPass &renderPass,
-    const vki::PipelineLayout &pipelineLayout) {
+    const vki::PipelineLayout &pipelineLayout,
+    const VkSampleCountFlagBits& sampleCount) {
     auto vertShader = vki::ShaderModule(logicalDevice, vertShaderCode);
     auto fragmentShader = vki::ShaderModule(logicalDevice, fragShaderCode);
     auto bindingDescription = Vertex::getBindingDescription();
@@ -96,9 +97,9 @@ vki::GraphicsPipeline createGraphicsPipeline(
 
     VkPipelineMultisampleStateCreateInfo multisample = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-        .sampleShadingEnable = VK_FALSE,
-        .minSampleShading = 1.0f,
+        .rasterizationSamples = sampleCount,
+        .sampleShadingEnable = VK_TRUE,
+        .minSampleShading = 0.3f,
         .pSampleMask = nullptr,
         .alphaToCoverageEnable = VK_FALSE,
         .alphaToOneEnable = VK_FALSE,
