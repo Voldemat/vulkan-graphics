@@ -127,9 +127,15 @@ void run_app() {
     GLFWController controller;
     mainLogger.info("Created GLFWController");
 
+    bool shouldClose = false;
     GLFWControllerWindow window =
         controller.createWindow("Hello triangle", 800, 600, true);
     glfwSetInputMode(window.getGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    window.registerKeyCallback([&shouldClose](int key, int scancode, int action, int mods){
+        if (key == GLFW_KEY_W && mods == 8) {
+            shouldClose = true;
+        };
+    });
     mainLogger.info("Obtained GLFWControllerWindow...");
 
     const auto &requiredExtensions = controller.getRequiredExtensions();
@@ -292,7 +298,7 @@ void run_app() {
     const auto &speedConf = 0.000000004f;
     float lastFrame = 0.0f;
     mainLogger.info("Entering main loop...");
-    while (!window.shouldClose()) {
+    while (!(window.shouldClose() || shouldClose)) {
         controller.pollEvents();
         processInput(window, frameState, speedConf);
         frameState.timeOfLastFrame = std::chrono::high_resolution_clock::now();
