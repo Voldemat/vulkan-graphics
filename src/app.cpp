@@ -1,5 +1,17 @@
 #include "./app.hpp"
 
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <stdexcept>
+
+#include "GLFW/glfw3.h"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/geometric.hpp"
+#include "glm/trigonometric.hpp"
+#include "vulkan_app/app/frame_state.hpp"
+
 // clang-format off
 #define ELPP_STL_LOGGING
 #include "easylogging++.h"
@@ -71,6 +83,44 @@ const std::vector<Vertex> vertices = { { .pos = { -0.5f, -0.5f, 0.0f },
                                          .texCoord = { 0.0f, 1.0f } } };
 
 const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 };
+void processInput(const GLFWControllerWindow &window, FrameState &state,
+                  float speedConf) {
+    const auto &now = std::chrono::high_resolution_clock::now();
+    float deltaTime = (now - state.timeOfLastFrame).count();
+    float speed = speedConf * deltaTime;
+    if (glfwGetKey(window.getGLFWWindow(), GLFW_KEY_W) == GLFW_PRESS)
+        state.cameraPos += speed * state.cameraFront;
+    if (glfwGetKey(window.getGLFWWindow(), GLFW_KEY_S) == GLFW_PRESS)
+        state.cameraPos -= speed * state.cameraFront;
+    if (glfwGetKey(window.getGLFWWindow(), GLFW_KEY_A) == GLFW_PRESS)
+        state.cameraPos -=
+            glm::normalize(glm::cross(state.cameraFront, state.cameraUp)) *
+            speed;
+    if (glfwGetKey(window.getGLFWWindow(), GLFW_KEY_D) == GLFW_PRESS)
+        state.cameraPos +=
+            glm::normalize(glm::cross(state.cameraFront, state.cameraUp)) *
+            speed;
+    double xpos, ypos;
+    glfwGetCursorPos(window.getGLFWWindow(), &xpos, &ypos);
+    if (state.firstMouse) {
+        state.firstMouse = false;
+        state.lastXPos = xpos;
+        state.lastYPos = ypos;
+    };
+    double xoffset = (xpos - state.lastXPos) * 0.1f;
+    double yoffset = (ypos - state.lastYPos) * 0.1f;
+    state.lastXPos = xpos;
+    state.lastYPos = ypos;
+    state.yaw += xoffset;
+    state.pitch += yoffset;
+    if (state.pitch > 89.0f) state.pitch = 89.0f;
+    if (state.pitch < -89.0f) state.pitch = -89.0f;
+    glm::vec3 direction;
+    direction.x = -cos(glm::radians(state.yaw)) * cos(glm::radians(state.pitch));
+    direction.y = sin(glm::radians(state.pitch));
+    direction.z = sin(glm::radians(state.yaw)) * cos(glm::radians(state.pitch));
+    state.cameraFront = glm::normalize(direction);
+};
 
 void run_app() {
     auto &mainLogger = *el::Loggers::getLogger("main");
@@ -78,7 +128,8 @@ void run_app() {
     mainLogger.info("Created GLFWController");
 
     GLFWControllerWindow window =
-        controller.createWindow("Hello triangle", 800, 600);
+        controller.createWindow("Hello triangle", 800, 600, true);
+    glfwSetInputMode(window.getGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     mainLogger.info("Obtained GLFWControllerWindow...");
 
     const auto &requiredExtensions = controller.getRequiredExtensions();
@@ -171,8 +222,9 @@ void run_app() {
         createPipelineLayout(logicalDevice, descriptorSetLayout);
     mainLogger.info("Created pipeline layout");
 
-    const auto &pipeline = createGraphicsPipeline(
-        logicalDevice, mainLogger, swapchainExtent, renderPass, pipelineLayout, sampleCount);
+    const auto &pipeline =
+        createGraphicsPipeline(logicalDevice, mainLogger, swapchainExtent,
+                               renderPass, pipelineLayout, sampleCount);
     mainLogger.info("Created pipeline");
 
     const auto &commandPool = vki::CommandPool(logicalDevice, queueFamily);
@@ -224,14 +276,31 @@ void run_app() {
     const auto &inFlightFence = vki::Fence(logicalDevice, true);
     mainLogger.info("Created semaphores and fences");
 
+    FrameState frameState = {
+        .projection = glm::perspective(
+            glm::radians(45.0f),
+            swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f),
+        .timeOfLastFrame = std::chrono::high_resolution_clock::now(),
+        .cameraPos = glm::vec3(0.0f, 0.0f, 3.0f),
+        .cameraFront = glm::vec3(0.0f, 0.0f, -1.0f),
+        .cameraUp = glm::vec3(0.0f, -1.0f, 0.0f),
+        .pitch = 0.0f,
+        .yaw = -90.0f,
+        .firstMouse = true
+    };
+    frameState.projection[1][1] *= -1;
+    const auto &speedConf = 0.000000004f;
+    float lastFrame = 0.0f;
     mainLogger.info("Entering main loop...");
     while (!window.shouldClose()) {
         controller.pollEvents();
+        processInput(window, frameState, speedConf);
+        frameState.timeOfLastFrame = std::chrono::high_resolution_clock::now();
         drawFrame(logicalDevice, swapchain, swapchainExtent, renderPass,
                   pipeline, framebuffers, commandBuffer, inFlightFence,
                   imageAvailableSemaphore, renderFinishedSemaphore,
                   vertexBuffer, indexBuffer, queue, queue, uniformMappedMemory,
-                  pipelineLayout, descriptorSets, indices.size());
+                  pipelineLayout, descriptorSets, indices.size(), frameState);
     };
 
     mainLogger.info("Waiting for queued operations to complete...");

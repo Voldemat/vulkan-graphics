@@ -6,11 +6,11 @@
 #include <cstring>
 #include <vector>
 
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_float4x4.hpp"
+#include "vulkan_app/app/frame_state.hpp"
+
+#define GLM_ENABLE_EXPERIMENTAL
 #include "glm/ext/matrix_transform.hpp"
-#include "glm/ext/vector_float3.hpp"
-#include "glm/trigonometric.hpp"
+#include "glm/gtx/string_cast.hpp"
 #include "vulkan_app/app/uniform_buffer_object.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
@@ -26,23 +26,17 @@
 #include "vulkan_app/vki/swapchain.hpp"
 
 void updateFrameUniformBuffer(void *bufferMappedMemory,
-                              const VkExtent2D &swapchainExtent) {
-    //static auto startTime = std::chrono::high_resolution_clock::now();
-    //auto currentTime = std::chrono::high_resolution_clock::now();
-    //float time = std::chrono::duration<float, std::chrono::seconds::period>(
-    //                 currentTime - startTime)
-    //                 .count();
+                              const FrameState &frameState) {
     UniformBufferObject ubo = {
-        .model = glm::rotate(glm::mat4(1.0f), 1.0f * glm::radians(90.0f),
-                             glm::vec3(0.0f, 0.0f, 1.0f)),
-        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                            glm::vec3(0.0f, 0.0f, 0.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f)),
-        .proj = glm::perspective(
-            glm::radians(45.0f),
-            swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f),
+        .model = { { 1.0f, 0.0f, 0.0f, 0.0f },
+                   { 0.0f, 1.0f, 0.0f, 0.0f },
+                   { 0.0f, 0.0f, 1.0f, 0.0f },
+                   { 0.0f, 0.0f, 0.0f, 1.0f } },
+        .view = glm::lookAt(frameState.cameraPos,
+                            frameState.cameraPos + frameState.cameraFront,
+                            frameState.cameraUp),
+        .proj = frameState.projection,
     };
-    ubo.proj[1][1] *= -1;
     memcpy(bufferMappedMemory, &ubo, sizeof(ubo));
 };
 
@@ -110,7 +104,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const std::vector<void *> &uniformMapped,
                const vki::PipelineLayout &pipelineLayout,
                const std::vector<VkDescriptorSet> &descriptorSets,
-               const uint32_t &indicesSize) {
+               const uint32_t &indicesSize, const FrameState &frameState) {
     inFlightFence.waitAndReset();
 
     uint32_t imageIndex =
@@ -120,7 +114,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                         renderPass, pipeline, commandBuffer, vertexBuffer,
                         indexBuffer, pipelineLayout, descriptorSets[imageIndex],
                         indicesSize);
-    updateFrameUniformBuffer(uniformMapped[imageIndex], swapchainExtent);
+    updateFrameUniformBuffer(uniformMapped[imageIndex], frameState);
     const vki::SubmitInfo submitInfo(
         { .waitSemaphores = { &imageAvailableSemaphore },
           .signalSemaphores = { &renderFinishedSemaphore },

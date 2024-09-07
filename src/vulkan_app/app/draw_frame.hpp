@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "vulkan_app/app/frame_state.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
 #include "vulkan_app/vki/fence.hpp"
@@ -33,4 +34,5 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const std::vector<void *> &uniformMapped,
                const vki::PipelineLayout &pipelineLayout,
                const std::vector<VkDescriptorSet> &descriptorSets,
-               const uint32_t &indicesSize);
+               const uint32_t &indicesSize,
+               const FrameState& frameState);
