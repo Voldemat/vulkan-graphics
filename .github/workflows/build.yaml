@@ -16,7 +16,7 @@ jobs:
     - name: Install dependencies
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: xorg openbox libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev libc++-18-dev clang-18
+        packages: xorg openbox libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev libc++-18-dev clang-18 nasm
     - name: Cache Build
       id: restore-cache-build
       uses: actions/cache/restore@v4
