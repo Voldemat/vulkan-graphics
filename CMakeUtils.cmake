@@ -1,4 +1,4 @@
-function(add_shaders TARGET_NAME)
+function(compile_shaders TARGET_NAME)
   set(SHADER_SOURCE_FILES ${ARGN})
   set(SHADER_COMMANDS)
   set(SHADER_PRODUCTS)
@@ -30,57 +30,75 @@ function(add_shaders TARGET_NAME)
       ${TARGET_NAME} ALL
       DEPENDS ${SHADER_PRODUCTS}
     )
-  set(add_shaders_RETURN ${SHADER_PRODUCTS} PARENT_SCOPE)
+  set(compile_shaders_RETURN ${SHADER_PRODUCTS} PARENT_SCOPE)
 endfunction()
 
-function(generate_shader_assembly INPUT_FILE_BASE INPUT_FILE_NAME)
+function(generate_obj_assembly INPUT_FILE_BASE INPUT_FILE_NAME)
     if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         set(SEGMENT_PREFIX "_")
     endif()
-    set(generate_shader_assembly_RETURN "\
-    \t.global ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}\n\
-    \t.global ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}\n\
-    ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}:\n\
-    \t.incbin \"${INPUT_FILE_NAME}\"\n\
-    ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}:\n\
-    " PARENT_SCOPE)
+    set(generate_obj_assembly_RETURN "\
+#if defined(__linux__) && defined(__ELF__)\n\
+.section .note.GNU-stack, \"\", %progbits\n\
+#endif\n\
+\n\
+#if defined(__APPLE__)\n\
+.section __DATA, __const\n\
+#elif defined(_WIN32)\n\
+.section .rdata\n\
+#else\n\
+.section .rodata, \"a\", %progbits\n\
+#endif\n\
+\t.global ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}\n\
+\t.global ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}\n\
+${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}:\n\
+\t.incbin \"${INPUT_FILE_NAME}\"\n\
+${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}:\n\
+" PARENT_SCOPE)
 endfunction()
-function(prepare_shaders TARGET_NAME)
-  set(SPV_SHADER_FILES ${ARGN})
+function(binary_files_to_object_files TARGET_NAME)
+  set(INPUT_FILES ${ARGN})
   set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${TARGET_NAME}.dir")
   set(PREPARE_COMMANDS)
   set(PREPARE_PRODUCTS)
 
-  foreach(SOURCE_FILE IN LISTS SPV_SHADER_FILES)
+  foreach(SOURCE_FILE IN LISTS INPUT_FILES)
     cmake_path(ABSOLUTE_PATH SOURCE_FILE NORMALIZE)
-    cmake_path(GET SOURCE_FILE FILENAME SHADER_NAME)
-    string(REPLACE "." "_" SHADER_ASM_NAME ${SHADER_NAME})
+    cmake_path(GET SOURCE_FILE FILENAME BINARY_FILENAME)
+    string(REPLACE "." "_" VAR_NAME ${BINARY_FILENAME})
     
-    generate_shader_assembly(${SHADER_ASM_NAME} ${SOURCE_FILE})
-    set(SHADER_ASM_PATH "${OUTPUT_DIR}/${SHADER_NAME}.s")
-    set(SHADER_OBJ_PATH "${OUTPUT_DIR}/${SHADER_NAME}.o")
-    write_file(${SHADER_ASM_PATH} ${generate_shader_assembly_RETURN})
+    generate_obj_assembly(${VAR_NAME} ${SOURCE_FILE})
+    set(ASM_TEMPLATE_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.template.s")
+    set(ASM_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.s")
+    set(OBJ_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.o")
+    write_file(${ASM_TEMPLATE_PATH} ${generate_obj_assembly_RETURN})
     list(APPEND SHADER_COMMAND COMMAND)
-    list(APPEND SHADER_COMMAND as)
-    list(APPEND SHADER_COMMAND "${SHADER_ASM_PATH}")
+    list(APPEND SHADER_COMMAND ${CMAKE_C_COMPILER})
+    list(APPEND SHADER_COMMAND "-E")
+    list(APPEND SHADER_COMMAND "${ASM_TEMPLATE_PATH}")
     list(APPEND SHADER_COMMAND "-o")
-    list(APPEND SHADER_COMMAND "${SHADER_OBJ_PATH}")
+    list(APPEND SHADER_COMMAND "${ASM_PATH}")
+    list(APPEND SHADER_COMMAND "&&")
+    list(APPEND SHADER_COMMAND as)
+    list(APPEND SHADER_COMMAND "${ASM_PATH}")
+    list(APPEND SHADER_COMMAND "-o")
+    list(APPEND SHADER_COMMAND "${OBJ_PATH}")
     # Add product
-    list(APPEND PREPARE_PRODUCTS "${SHADER_OBJ_PATH}")
+    list(APPEND PREPARE_PRODUCTS "${OBJ_PATH}")
     list(APPEND PREPARE_COMMANDS "${SHADER_COMMAND}")
 
   endforeach()
   add_custom_command(
     OUTPUT ${PREPARE_PRODUCTS}
     ${PREPARE_COMMANDS}
-    DEPENDS ${SPV_SHADER_FILES}
-    COMMENT "Transforming shaders into object files [${TARGET_NAME}]"
+    DEPENDS ${INPUT_FILES}
+    COMMENT "Transforming binary files into object files [${TARGET_NAME}]"
   )
   add_custom_target(
       ${TARGET_NAME} ALL
       DEPENDS ${PREPARE_PRODUCTS}
     )
-  set(prepare_shaders_RETURN ${PREPARE_PRODUCTS} PARENT_SCOPE)
+  set(binary_files_to_object_files_RETURN ${PREPARE_PRODUCTS} PARENT_SCOPE)
 endfunction()
 
 function (cmake_print_all_variables)

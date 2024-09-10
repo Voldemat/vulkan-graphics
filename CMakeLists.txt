@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-find_package(Vulkan REQUIRED)
+find_package(Vulkan 1.3.250 REQUIRED)
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/vendor/easyloggingpp.cmake")
@@ -21,9 +21,12 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeUtils.cmake")
 file(GLOB_RECURSE GRAPHICS_HEADERS src/*.hpp src/*.h)
 file(GLOB_RECURSE GRAPHICS_SOURCES src/*.cpp src/*.c)
 file(GLOB_RECURSE GLSL_SHADERS src/shaders/*.frag src/shaders/*.vert)
-add_shaders(glsl-shaders ${GLSL_SHADERS})
-set(GLSL_COMPILED_SHADERS ${add_shaders_RETURN})
-prepare_shaders(glsl-shaders-object-files ${GLSL_COMPILED_SHADERS})
+compile_shaders(glsl-shaders ${GLSL_SHADERS})
+binary_files_to_object_files(shaders-embedded ${compile_shaders_RETURN})
+set(EMBEDDED_SHADERS ${binary_files_to_object_files_RETURN})
+file(GLOB_RECURSE ASSETS src/assets/*)
+binary_files_to_object_files(assets-embedded ${ASSETS})
+set(EMBEDDED_ASSETS ${binary_files_to_object_files_RETURN})
 add_executable(
     main
     ${GRAPHICS_HEADERS}
@@ -46,7 +49,8 @@ target_link_libraries(
     glm
     easyloggingpp
     magic_enum::magic_enum
-    turbojpeg-static
+    turbojpeg
     png_static
-    ${prepare_shaders_RETURN}
+    ${EMBEDDED_SHADERS}
+    ${EMBEDDED_ASSETS}
 )

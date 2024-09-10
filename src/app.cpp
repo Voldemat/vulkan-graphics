@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include <stdexcept>
 
 #include "GLFW/glfw3.h"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -138,10 +137,24 @@ void run_app() {
     });
     mainLogger.info("Obtained GLFWControllerWindow...");
 
-    const auto &requiredExtensions = controller.getRequiredExtensions();
-    mainLogger.info("GLFW Required extensions: ");
-    mainLogger.info(requiredExtensions);
+    auto requiredExtensions = controller.getRequiredExtensions();
+    mainLogger.info("GLFW Required extensions: %v", requiredExtensions);
+    uint32_t count = 0;
+    VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
+    if (result != VK_SUCCESS) {
+        // Throw an exception or log the error
+    }
 
+    std::vector<VkExtensionProperties> extensionProperties(count);
+
+    // Get the extensions
+    result = vkEnumerateInstanceExtensionProperties(nullptr, &count, extensionProperties.data());
+    if (result != VK_SUCCESS) {
+        // Throw an exception or log the error
+    }
+    for (const auto& a : extensionProperties) {
+        std::cout << a.extensionName << std::endl;
+    };
     vki::VulkanInstance instance({
         .extensions = requiredExtensions,
         .appName = "Hello triangle",
@@ -159,6 +172,7 @@ void run_app() {
     mainLogger.info(
         std::format("Picked physical device: {}", (std::string)physicalDevice));
 
+    std::cout << "driver version: " << physicalDevice.properties.driverVersion << std::endl;
     const auto &queueFamily =
         pickQueueFamily(physicalDevice.getQueueFamilies());
     mainLogger.info(std::format("Picked graphics and present queue family: {}",

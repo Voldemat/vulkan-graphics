@@ -1,11 +1,16 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 
 struct ImageData {
     unsigned int width;
     unsigned int height;
-    unsigned char* buffer;
+    uint8_t* buffer;
+
+    ~ImageData() {
+        delete buffer;
+    };
 };
 
 ImageData load_png_image(const std::filesystem::path &filename);

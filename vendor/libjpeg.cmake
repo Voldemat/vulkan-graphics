@@ -1,18 +1,19 @@
-include(FetchContent)
-FetchContent_Declare(
+include(ExternalProject)
+ExternalProject_Add(
     libjpeg
-    GIT_REPOSITORY https://github.com/winlibs/libjpeg
-    GIT_TAG libjpeg-turbo-2.1.0
+    GIT_REPOSITORY https://github.com/libjpeg-turbo/libjpeg-turbo
+    GIT_TAG 3.0.3
     CMAKE_ARGS -DENABLE_SHARED=OFF -D REQUIRE_SIMD=ON
+    INSTALL_COMMAND ""
+    UPDATE_COMMAND ""
+    PATCH_COMMAND ""
+    BUILD_COMMAND ${CMAKE_COMMAND} --build . --target turbojpeg-static
 )
-FetchContent_MakeAvailable(libjpeg)
-set_target_properties(cjpeg-static PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(tjunittest-static PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(djpeg-static PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(tjbench-static PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(jpegtran-static PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(rdjpgcom PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(wrjpgcom PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(md5cmp PROPERTIES EXCLUDE_FROM_ALL 1)
-set_target_properties(jpeg-static PROPERTIES EXCLUDE_FROM_ALL 1)
-get_target_property(turbojpeg_INCLUDE_DIRS turbojpeg-static INCLUDE_DIRECTORIES)
+ExternalProject_Get_Property(libjpeg SOURCE_DIR)
+set(turbojpeg_INCLUDE_DIRS ${SOURCE_DIR})
+ExternalProject_Get_Property(libjpeg BINARY_DIR)
+set(turbojpeg_BUILD_DIR ${BINARY_DIR})
+add_library(turbojpeg STATIC IMPORTED)
+set_target_properties(
+    turbojpeg PROPERTIES IMPORTED_LOCATION ${turbojpeg_BUILD_DIR}/libturbojpeg.a
+)
