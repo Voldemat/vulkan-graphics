@@ -17,7 +17,6 @@ jobs:
     - name: CMake Action
       uses: threeal/cmake-action@v1.3.0
       with:
-        args: -DCMAKE_CXX_FLAGS="-fexperimental-library"
         run-build: true
     - name: upload executable
       uses: actions/upload-artifact@v4
