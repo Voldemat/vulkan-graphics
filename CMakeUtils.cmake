@@ -1,36 +1,34 @@
 function(compile_shaders TARGET_NAME)
   set(SHADER_SOURCE_FILES ${ARGN})
-  set(SHADER_COMMANDS)
-  set(SHADER_PRODUCTS)
-  set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${TARGET_NAME}.dir")
+  set(SHADER_TARGETS)
 
   foreach(SHADER_SOURCE IN LISTS SHADER_SOURCE_FILES)
     cmake_path(ABSOLUTE_PATH SHADER_SOURCE NORMALIZE)
-    cmake_path(GET SHADER_SOURCE FILENAME SHADER_NAME)
+    cmake_path(GET SHADER_SOURCE FILENAME SHADER_FILENAME)
+    string(REPLACE "." "_" SHADER_NAME "${SHADER_FILENAME}.spv")
     
+    set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${SHADER_NAME}.dir")
     # Build command
     list(APPEND SHADER_COMMAND COMMAND)
     list(APPEND SHADER_COMMAND Vulkan::glslc)
     list(APPEND SHADER_COMMAND "${SHADER_SOURCE}")
     list(APPEND SHADER_COMMAND "-o")
-    list(APPEND SHADER_COMMAND "${OUTPUT_DIR}/${SHADER_NAME}.spv")
-
-    # Add product
-    list(APPEND SHADER_PRODUCTS "${OUTPUT_DIR}/${SHADER_NAME}.spv")
-    list(APPEND SHADER_COMMANDS "${SHADER_COMMAND}")
+    set(OUTPUT_FILENAME "${OUTPUT_DIR}/${SHADER_FILENAME}.spv")
+    list(APPEND SHADER_COMMAND "${OUTPUT_FILENAME}")
+    add_custom_command(
+        OUTPUT ${OUTPUT_FILENAME}
+        COMMAND Vulkan::glslc "${SHADER_SOURCE}" -o "${OUTPUT_FILENAME}"
+        DEPENDS ${SHADER_SOURCE}
+    )
+    add_custom_target(
+        ${SHADER_NAME} ALL
+        DEPENDS ${OUTPUT_FILENAME}
+    )
+    set_target_properties(${SHADER_NAME} PROPERTIES OUTPUT_NAME ${OUTPUT_FILENAME})
+    list(APPEND SHADER_TARGETS ${SHADER_NAME})
 
   endforeach()
-  add_custom_command(
-    OUTPUT ${SHADER_PRODUCTS}
-    ${SHADER_COMMANDS}
-    DEPENDS ${SHADER_SOURCE_FILES}
-    COMMENT "Compiling Shaders [${TARGET_NAME}]"
-  )
-  add_custom_target(
-      ${TARGET_NAME} ALL
-      DEPENDS ${SHADER_PRODUCTS}
-    )
-  set(compile_shaders_RETURN ${SHADER_PRODUCTS} PARENT_SCOPE)
+  set(compile_shaders_RETURN ${SHADER_TARGETS} PARENT_SCOPE)
 endfunction()
 
 function(generate_obj_assembly INPUT_FILE_BASE INPUT_FILE_NAME)
@@ -54,41 +52,29 @@ ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}:\n\
 " PARENT_SCOPE)
 endfunction()
 function(binary_files_to_object_files TARGET_NAME)
-  set(INPUT_FILES ${ARGN})
-  set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${TARGET_NAME}.dir")
-  set(PREPARE_COMMANDS)
-  set(PREPARE_PRODUCTS)
-
-  foreach(SOURCE_FILE IN LISTS INPUT_FILES)
-    cmake_path(ABSOLUTE_PATH SOURCE_FILE NORMALIZE)
-    cmake_path(GET SOURCE_FILE FILENAME BINARY_FILENAME)
-    string(REPLACE "." "_" VAR_NAME ${BINARY_FILENAME})
-    
-    generate_obj_assembly(${VAR_NAME} ${SOURCE_FILE})
-    set(ASM_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.s")
-    set(OBJ_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.o")
+  set(INPUT_TARGETS ${ARGN})
+  set(PREPARE_TARGETS)
+  foreach(SOURCE_TARGET IN LISTS INPUT_TARGETS)
+    get_target_property(SOURCE_TARGET_LOCATION ${SOURCE_TARGET} OUTPUT_NAME)
+    generate_obj_assembly(${SOURCE_TARGET} ${SOURCE_TARGET_LOCATION})
+    set(NEW_TARGET_NAME "${SOURCE_TARGET}-object")
+    set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${NEW_TARGET_NAME}.dir")
+    set(ASM_PATH "${OUTPUT_DIR}/${SOURCE_TARGET}.s")
     write_file(${ASM_PATH} ${generate_obj_assembly_RETURN})
-    list(APPEND SHADER_COMMAND COMMAND)
-    list(APPEND SHADER_COMMAND as)
-    list(APPEND SHADER_COMMAND "${ASM_PATH}")
-    list(APPEND SHADER_COMMAND "-o")
-    list(APPEND SHADER_COMMAND "${OBJ_PATH}")
-    # Add product
-    list(APPEND PREPARE_PRODUCTS "${OBJ_PATH}")
-    list(APPEND PREPARE_COMMANDS "${SHADER_COMMAND}")
-
-  endforeach()
-  add_custom_command(
-    OUTPUT ${PREPARE_PRODUCTS}
-    ${PREPARE_COMMANDS}
-    DEPENDS ${INPUT_FILES}
-    COMMENT "Transforming binary files into object files [${TARGET_NAME}]"
-  )
-  add_custom_target(
-      ${TARGET_NAME} ALL
-      DEPENDS ${PREPARE_PRODUCTS}
+    add_library(
+        ${NEW_TARGET_NAME}
+        OBJECT "${ASM_PATH}"
     )
-  set(binary_files_to_object_files_RETURN ${PREPARE_PRODUCTS} PARENT_SCOPE)
+    SET_SOURCE_FILES_PROPERTIES(
+        "${ASM_PATH}"
+        PROPERTIES
+        OBJECT_DEPENDS
+        ${SOURCE_TARGET_LOCATION}
+    )
+    add_dependencies("${NEW_TARGET_NAME}" "${SOURCE_TARGET}")
+    list(APPEND PREPARE_TARGETS "${NEW_TARGET_NAME}")
+  endforeach()
+  set(binary_files_to_object_files_RETURN ${PREPARE_TARGETS} PARENT_SCOPE)
 endfunction()
 
 function (cmake_print_all_variables)
