@@ -36,19 +36,16 @@ endfunction()
 function(generate_obj_assembly INPUT_FILE_BASE INPUT_FILE_NAME)
     if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         set(SEGMENT_PREFIX "_")
+        set(START_STRING ".section __DATA, __const")
+    elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+        set(START_STRING ".section .note.GNU-stack, \"\", %progbits")
+    elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+        set(START_STRING ".section .rdata")
+    else()
+        set(START_STRING ".section .rodata, \"a\", %progbits")
     endif()
     set(generate_obj_assembly_RETURN "\
-#if defined(__linux__) && defined(__ELF__)\n\
-.section .note.GNU-stack, \"\", %progbits\n\
-#endif\n\
-\n\
-#if defined(__APPLE__)\n\
-.section __DATA, __const\n\
-#elif defined(_WIN32)\n\
-.section .rdata\n\
-#else\n\
-.section .rodata, \"a\", %progbits\n\
-#endif\n\
+${START_STRING}\n\
 \t.global ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}\n\
 \t.global ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}\n\
 ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}:\n\
@@ -68,35 +65,14 @@ function(binary_files_to_object_files TARGET_NAME)
     string(REPLACE "." "_" VAR_NAME ${BINARY_FILENAME})
     
     generate_obj_assembly(${VAR_NAME} ${SOURCE_FILE})
-    set(ASM_TEMPLATE_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.template.s")
     set(ASM_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.s")
     set(OBJ_PATH "${OUTPUT_DIR}/${BINARY_FILENAME}.o")
-    write_file(${ASM_TEMPLATE_PATH} ${generate_obj_assembly_RETURN})
-    if (CMAKE_C_COMPILER EQUAL "cl")
-        list(APPEND SHADER_COMMAND COMMAND)
-        list(APPEND SHADER_COMMAND "cl")
-        list(APPEND SHADER_COMMAND "/P")
-        list(APPEND SHADER_COMMAND "${ASM_TEMPLATE_PATH}")
-        list(APPEND SHADER_COMMAND "/Fi")
-        list(APPEND SHADER_COMMAND "${ASM_PATH}")
-        list(APPEND SHADER_COMMAND "&&")
-        list(APPEND SHADER_COMMAND as)
-        list(APPEND SHADER_COMMAND "${ASM_PATH}")
-        list(APPEND SHADER_COMMAND "-o")
-        list(APPEND SHADER_COMMAND "${OBJ_PATH}")
-    else()
+    write_file(${ASM_PATH} ${generate_obj_assembly_RETURN})
     list(APPEND SHADER_COMMAND COMMAND)
-    list(APPEND SHADER_COMMAND ${CMAKE_C_COMPILER})
-    list(APPEND SHADER_COMMAND "-E")
-    list(APPEND SHADER_COMMAND "${ASM_TEMPLATE_PATH}")
-    list(APPEND SHADER_COMMAND "-o")
-    list(APPEND SHADER_COMMAND "${ASM_PATH}")
-    list(APPEND SHADER_COMMAND "&&")
     list(APPEND SHADER_COMMAND as)
     list(APPEND SHADER_COMMAND "${ASM_PATH}")
     list(APPEND SHADER_COMMAND "-o")
     list(APPEND SHADER_COMMAND "${OBJ_PATH}")
-    endif()
     # Add product
     list(APPEND PREPARE_PRODUCTS "${OBJ_PATH}")
     list(APPEND PREPARE_COMMANDS "${SHADER_COMMAND}")
