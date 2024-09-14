@@ -14,14 +14,15 @@ jobs:
       with:
         version: 1.3.250.1
         cache: true
-    - name: Chocolatey install wget
+    - name: Chocolatey install clang and ninja
       uses: crazy-max/ghaction-chocolatey@v3
       with:
-        args: install llvm --version=18.1.8
+        args: install llvm ninja
     - name: CMake Action
       uses: threeal/cmake-action@v1.3.0
       with:
         run-build: true
+        generator: Ninja
         args: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_ASM_COMPILER=clang
     - name: upload executable
       uses: actions/upload-artifact@v4
