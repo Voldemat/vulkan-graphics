@@ -22,9 +22,7 @@ jobs:
       uses: threeal/cmake-action@v1.3.0
       with:
         run-build: true
-        c-compiler: clang
-        cxx-compiler: clang++
-        args: -DCMAKE_ASM_COMPILER=clang
+        args: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_ASM_COMPILER=clang
     - name: upload executable
       uses: actions/upload-artifact@v4
       with:
