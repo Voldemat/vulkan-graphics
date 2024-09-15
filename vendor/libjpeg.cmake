@@ -28,6 +28,7 @@ set(turbojpeg_INCLUDE_DIRS ${SOURCE_DIR})
 ExternalProject_Get_Property(libjpeg BINARY_DIR)
 set(turbojpeg_BUILD_DIR ${BINARY_DIR})
 add_library(turbojpeg STATIC IMPORTED)
+target_compile_options(turbojpeg PRIVATE -Wno-attributes)
 set_target_properties(
     turbojpeg PROPERTIES IMPORTED_LOCATION ${turbojpeg_BUILD_DIR}/libturbojpeg.a
 )
