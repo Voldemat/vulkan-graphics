@@ -41,6 +41,9 @@ add_executable(
     ${GRAPHICS_HEADERS}
     ${GRAPHICS_SOURCES}
 )
+if (WINDOWS)
+    target_compile_options(main PRIVATE -D NOMINMAX=1)
+endif()
 target_include_directories(
     main
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
