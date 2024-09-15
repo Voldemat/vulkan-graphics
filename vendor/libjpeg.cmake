@@ -1,13 +1,13 @@
 include(ExternalProject)
 option(LIBJPEG_C_COMPILER "Compiler for libjpeg external project" ${CMAKE_C_COMPILER})
-option(LIBJPEG_LINKER "Linker for libjpeg external project" ${CMAKE_LINKER})
+option(LIBJPEG_LINKER_TYPE "Linker type for libjpeg external project" ${CMAKE_LINKER_TYPE})
 ExternalProject_Add(
     libjpeg
     GIT_REPOSITORY https://github.com/libjpeg-turbo/libjpeg-turbo
     GIT_TAG 3.0.3
     CMAKE_ARGS -DENABLE_SHARED=OFF
     -DCMAKE_C_COMPILER=${LIBJPEG_C_COMPILER}
-    -DCMAKE_LINKER=${LIBJPEG_LINKER}
+    -DCMAKE_LINKER_TYPE=${LIBJPEG_LINKER_TYPE}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     INSTALL_COMMAND ""
     UPDATE_COMMAND ""
