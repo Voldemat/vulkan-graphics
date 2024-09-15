@@ -16,7 +16,7 @@ jobs:
     - name: Chocolatey install dependencies
       uses: crazy-max/ghaction-chocolatey@v3
       with:
-        args: install llvm make gcc
+        args: install llvm make msys2
     - name: Cache Build
       id: restore-cache-build
       uses: actions/cache/restore@v4
