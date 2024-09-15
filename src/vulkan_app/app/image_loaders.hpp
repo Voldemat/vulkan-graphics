@@ -13,5 +13,4 @@ struct ImageData {
     };
 };
 
-ImageData load_png_image(const std::filesystem::path &filename);
 ImageData load_jpeg_image(const std::filesystem::path &filename);
