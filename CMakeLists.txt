@@ -41,7 +41,7 @@ add_executable(
     ${GRAPHICS_HEADERS}
     ${GRAPHICS_SOURCES}
 )
-if (WINDOWS)
+if (WIN32)
     target_compile_options(main PRIVATE -D NOMINMAX=1)
 endif()
 target_include_directories(
