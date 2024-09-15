@@ -3,7 +3,7 @@ ExternalProject_Add(
     libjpeg
     GIT_REPOSITORY https://github.com/libjpeg-turbo/libjpeg-turbo
     GIT_TAG 3.0.3
-    CMAKE_ARGS -DENABLE_SHARED=OFF
+    CMAKE_ARGS -DENABLE_SHARED=OFF -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     INSTALL_COMMAND ""
     UPDATE_COMMAND ""
     PATCH_COMMAND ""
