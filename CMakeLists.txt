@@ -5,8 +5,6 @@ include(GNUInstallDirs)
 include(CMakePrintHelpers)
 include(FetchContent)
 
-cmake_print_variables(CMAKE_VERSION)
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
