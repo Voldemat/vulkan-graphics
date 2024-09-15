@@ -31,9 +31,11 @@ jobs:
     - name: CMake Action
       uses: threeal/cmake-action@v2.0.0
       with:
-        run-build: true
+        run-build: false
         generator: "Unix Makefiles"
         args: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_ASM_COMPILER=clang -DLIBJPEG_C_COMPILER=gcc -DCMAKE_LINKER_TYPE=LLD
+    - name: check
+      run: cat build/compile_commands.json && cat build/CMakeFiles/main.dir/link.txt
     - uses: actions/cache/save@v3
       name: Save build cache
       with:
