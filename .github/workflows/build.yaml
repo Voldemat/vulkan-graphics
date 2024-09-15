@@ -35,7 +35,7 @@ jobs:
         generator: "Unix Makefiles"
         args: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_ASM_COMPILER=clang -DLIBJPEG_C_COMPILER=gcc -DCMAKE_LINKER_TYPE=LLD
     - name: check
-      run: cat build/compile_commands.json && ls build && ls build/CMakeFiles && ls build/CMakeFiles/main.dir && cat build/CMakeFiles/main.dir/link.txt
+      run: cat build/compile_commands.json && cat build/CMakeFiles/main.dir/linkLibs.rsp && cat build/CMakeFiles/main.dir/objects1.rsp && cat build/CMakeFiles/main.dir/includes_CXX.rsp && cat build/CMakeFiles/main.dir/includes_ASM.rsp
     - uses: actions/cache/save@v3
       name: Save build cache
       with:
