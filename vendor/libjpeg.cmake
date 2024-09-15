@@ -18,6 +18,7 @@ ExternalProject_Add(
     -DCMAKE_C_COMPILER=${LIBJPEG_C_COMPILER}
     ${LIBJPEG_LINKER_TYPE_ARG}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_CXX_FLAGS="-Wno-attributes"
     INSTALL_COMMAND ""
     UPDATE_COMMAND ""
     PATCH_COMMAND ""
@@ -28,7 +29,6 @@ set(turbojpeg_INCLUDE_DIRS ${SOURCE_DIR})
 ExternalProject_Get_Property(libjpeg BINARY_DIR)
 set(turbojpeg_BUILD_DIR ${BINARY_DIR})
 add_library(turbojpeg STATIC IMPORTED)
-target_compile_options(turbojpeg PRIVATE -Wno-attributes)
 set_target_properties(
     turbojpeg PROPERTIES IMPORTED_LOCATION ${turbojpeg_BUILD_DIR}/libturbojpeg.a
 )

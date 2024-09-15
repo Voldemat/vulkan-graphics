@@ -41,7 +41,7 @@ add_executable(
     ${GRAPHICS_HEADERS}
     ${GRAPHICS_SOURCES}
 )
-target_link_options(main AFTER PRIVATE -fuse-ld=lld)
+target_link_options(main PRIVATE -fuse-ld=lld)
 if (WIN32)
     target_compile_options(main PRIVATE -D NOMINMAX=1)
 endif()
