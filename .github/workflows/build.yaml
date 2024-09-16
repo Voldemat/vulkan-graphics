@@ -23,6 +23,7 @@ jobs:
       with:
         path: build
         key: ${{ runner.os }}-build
+    - uses: ilammy/msvc-dev-cmd@v1.4.1
     - name: Setup cmake
       uses: jwlawson/actions-setup-cmake@v2
       with:
