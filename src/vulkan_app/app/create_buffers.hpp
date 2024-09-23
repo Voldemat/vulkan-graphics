@@ -3,7 +3,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
-#include <cstdint>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -22,7 +22,8 @@ std::tuple<vki::Buffer, vki::Buffer> createVertexAndIndicesBuffer(
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
     el::Logger &logger, const vki::CommandPool &commandPool,
     const vki::GraphicsQueueMixin &graphicsQueue,
-    const std::vector<Vertex> &vertices, const std::vector<uint16_t> &indices);
+    const std::span<const Vertex> &vertices,
+    const std::span<const unsigned int> &indices);
 
 std::tuple<std::vector<vki::Buffer>, std::vector<void *>> createUniformBuffers(
     const vki::LogicalDevice &logicalDevice,

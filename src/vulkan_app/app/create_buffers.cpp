@@ -3,11 +3,11 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 #include <format>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -143,7 +143,8 @@ std::tuple<vki::Buffer, vki::Buffer> createVertexAndIndicesBuffer(
     const VkPhysicalDeviceMemoryProperties &memoryProperties,
     el::Logger &logger, const vki::CommandPool &commandPool,
     const vki::GraphicsQueueMixin &graphicsQueue,
-    const std::vector<Vertex> &vertices, const std::vector<uint16_t> &indices) {
+    const std::span<const Vertex> &vertices,
+    const std::span<const unsigned int> &indices) {
     const auto &verticesSize = sizeof(vertices[0]) * vertices.size();
     const auto &vertexStagingBuffer =
         createStagingBuffer(logicalDevice, memoryProperties, logger,

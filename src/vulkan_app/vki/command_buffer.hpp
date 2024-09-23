@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -39,18 +40,18 @@ struct RenderPassBeginInfo {
 };
 
 struct DrawArgs {
-    unsigned int vertexCount;
-    unsigned int instanceCount;
-    unsigned int firstVertex = 0;
-    unsigned int firstInstance = 0;
+    uint32_t vertexCount;
+    uint32_t instanceCount;
+    uint32_t firstVertex = 0;
+    uint32_t firstInstance = 0;
 };
 
 struct DrawIndexedArgs {
-    unsigned int indexCount;
-    unsigned int instanceCount;
-    unsigned int firstIndex;
-    int vertexOffset;
-    unsigned int firstInstance;
+    uint32_t indexCount;
+    uint32_t instanceCount;
+    uint32_t firstIndex;
+    int32_t vertexOffset;
+    uint32_t firstInstance;
 };
 
 struct BindVertexBuffersArgs {

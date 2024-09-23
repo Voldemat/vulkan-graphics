@@ -2,9 +2,9 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include <cstdint>
 #include <vector>
 
+#include "vulkan_app/app/data_aggregator.hpp"
 #include "vulkan_app/app/frame_state.hpp"
 #include "vulkan_app/vki/buffer.hpp"
 #include "vulkan_app/vki/command_buffer.hpp"
@@ -34,5 +34,5 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
                const std::vector<void *> &uniformMapped,
                const vki::PipelineLayout &pipelineLayout,
                const std::vector<VkDescriptorSet> &descriptorSets,
-               const uint32_t &indicesSize,
-               const FrameState& frameState);
+               const FrameState &frameState,
+               const DataAggregator& aggregator);

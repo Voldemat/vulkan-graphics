@@ -6,6 +6,7 @@ include(CMakePrintHelpers)
 include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -41,7 +42,6 @@ add_executable(
     ${GRAPHICS_HEADERS}
     ${GRAPHICS_SOURCES}
 )
-target_link_options(main PRIVATE -fuse-ld=lld -stdlib=libc++)
 if (WIN32)
     target_compile_options(main PRIVATE -D NOMINMAX=1)
 endif()

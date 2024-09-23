@@ -8,10 +8,10 @@
                 "CMAKE_OSX_SYSROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
             },
             "environment": {
-                "CC": "/Users/vladimir/code/opensource/llvm-project/builds/clang/bin/clang",
-                "CXX": "/Users/vladimir/code/opensource/llvm-project/builds/clang/bin/clang++",
-                "CXXFLAGS": "-isystem /Users/vladimir/code/opensource/llvm-project/libcxx-prefix/include/c++/v1/ -nostdinc++ -nostdlib++",
-                "LDFLAGS": "-L /Users/vladimir/code/opensource/llvm-project/libcxx-prefix/lib/ -Wl,-rpath,/Users/vladimir/code/opensource/llvm-project/libcxx-prefix/lib/ -lc++"
+                "CC": "/Users/vladimir/code/opensource/llvm-project/build/bin/clang",
+                "CXX": "/Users/vladimir/code/opensource/llvm-project/build/bin/clang++",
+                "CXXFLAGS": "-isystem /Users/vladimir/code/opensource/llvm-project/build/include/c++/v1/ -nostdinc++ -nostdlib++",
+                "LDFLAGS": "-L /Users/vladimir/code/opensource/llvm-project/build/lib/ -Wl,-rpath,/Users/vladimir/code/opensource/llvm-project/build/lib/ -lc++"
             }
         }
     ]

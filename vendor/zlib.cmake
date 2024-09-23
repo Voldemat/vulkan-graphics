@@ -2,7 +2,7 @@ include(FetchContent)
 FetchContent_Declare(
     ZLIB
     GIT_REPOSITORY https://github.com/madler/zlib
-    GIT_TAG v1.2.12
+    GIT_TAG v1.3.1
     OVERRIDE_FIND_PACKAGE
 )
 set(ZLIB_BUILD_EXAMPLES OFF CACHE INTERNAL "")

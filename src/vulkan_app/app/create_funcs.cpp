@@ -329,7 +329,7 @@ vki::PresentMode choosePresentMode(
     const std::unordered_set<vki::PresentMode> &presentModes) {
     if (presentModes.contains(vki::PresentMode::MAILBOX_KHR))
         return vki::PresentMode::MAILBOX_KHR;
-    return vki::PresentMode::IMMEDIATE_KHR;
+    return vki::PresentMode::FIFO_KHR;
 };
 
 vki::Sampler createTextureSampler(

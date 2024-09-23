@@ -1,11 +1,15 @@
 #include "./draw_frame.hpp"
 
+#include <MacTypes.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <cstring>
+#include <format>
+#include <iostream>
 #include <vector>
 
+#include "vulkan_app/app/data_aggregator.hpp"
 #include "vulkan_app/app/frame_state.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -46,8 +50,19 @@ void recordCommandBuffer(
     const vki::GraphicsPipeline &pipeline,
     const vki::CommandBuffer &commandBuffer, const vki::Buffer &vertexBuffer,
     const vki::Buffer &indexBuffer, const vki::PipelineLayout &pipelineLayout,
-    const VkDescriptorSet &descriptorSet, const uint32_t &indicesSize) {
+    const VkDescriptorSet &descriptorSet,
+    const DataAggregator &dataAggregator) {
     commandBuffer.record([&]() {
+        //vkCmdUpdateBuffer(commandBuffer.getVkCommandBuffer(),
+        //                  vertexBuffer.getVkBuffer(), 0,
+        //                  sizeof(dataAggregator.vertexArray[0]) *
+        //                      dataAggregator.vertexArray.size(),
+        //                  dataAggregator.vertexArray.data());
+        //vkCmdUpdateBuffer(commandBuffer.getVkCommandBuffer(),
+        //                  indexBuffer.getVkBuffer(), 0,
+        //                  sizeof(dataAggregator.indexArray[0]) *
+        //                      dataAggregator.indexArray.size(),
+        //                  dataAggregator.indexArray.data());
         VkClearValue clearColor = { .color = { .float32 = { 0.0f, 0.0f, 0.0f,
                                                             1.0f } } };
         VkClearValue clearDepth = { .depthStencil = { 1.0f, 0 } };
@@ -70,7 +85,7 @@ void recordCommandBuffer(
                 commandBuffer.bindIndexBuffer({
                     .buffer = indexBuffer,
                     .offset = 0,
-                    .type = VK_INDEX_TYPE_UINT16,
+                    .type = VK_INDEX_TYPE_UINT32,
                 });
                 commandBuffer.bindDescriptorSet({
                     .bindPointType = vki::PipelineBindPointType::GRAPHICS,
@@ -79,32 +94,34 @@ void recordCommandBuffer(
                     .descriptorSets = { descriptorSet },
                     .dynamicOffsets = {},
                 });
-                commandBuffer.drawIndexed({ .indexCount = indicesSize,
-                                            .instanceCount = 1,
-                                            .firstIndex = 0,
-                                            .vertexOffset = 0,
-                                            .firstInstance = 0 });
+                for (const auto &shapeData : dataAggregator.shapes) {
+                    commandBuffer.drawIndexed({
+                        .indexCount = shapeData.indexCount,
+                        .instanceCount = 1,
+                        .firstIndex = shapeData.indexOffset,
+                        .vertexOffset = static_cast<int32_t>(shapeData.vertexOffset),
+                        .firstInstance = 0,
+                    });
+                };
             });
     });
 };
 
-void drawFrame(const vki::LogicalDevice &logicalDevice,
-               const vki::Swapchain &swapchain,
-               const VkExtent2D &swapchainExtent,
-               const vki::RenderPass &renderPass,
-               const vki::GraphicsPipeline &pipeline,
-               const std::vector<vki::Framebuffer> &framebuffers,
-               const vki::CommandBuffer &commandBuffer,
-               const vki::Fence &inFlightFence,
-               const vki::Semaphore &imageAvailableSemaphore,
-               const vki::Semaphore &renderFinishedSemaphore,
-               const vki::Buffer &vertexBuffer, const vki::Buffer &indexBuffer,
-               const vki::GraphicsQueueMixin &graphicsQueue,
-               const vki::PresentQueueMixin &presentQueue,
-               const std::vector<void *> &uniformMapped,
-               const vki::PipelineLayout &pipelineLayout,
-               const std::vector<VkDescriptorSet> &descriptorSets,
-               const uint32_t &indicesSize, const FrameState &frameState) {
+void drawFrame(
+    const vki::LogicalDevice &logicalDevice, const vki::Swapchain &swapchain,
+    const VkExtent2D &swapchainExtent, const vki::RenderPass &renderPass,
+    const vki::GraphicsPipeline &pipeline,
+    const std::vector<vki::Framebuffer> &framebuffers,
+    const vki::CommandBuffer &commandBuffer, const vki::Fence &inFlightFence,
+    const vki::Semaphore &imageAvailableSemaphore,
+    const vki::Semaphore &renderFinishedSemaphore,
+    const vki::Buffer &vertexBuffer, const vki::Buffer &indexBuffer,
+    const vki::GraphicsQueueMixin &graphicsQueue,
+    const vki::PresentQueueMixin &presentQueue,
+    const std::vector<void *> &uniformMapped,
+    const vki::PipelineLayout &pipelineLayout,
+    const std::vector<VkDescriptorSet> &descriptorSets,
+    const FrameState &frameState, const DataAggregator &dataAggregator) {
     inFlightFence.waitAndReset();
 
     uint32_t imageIndex =
@@ -113,7 +130,7 @@ void drawFrame(const vki::LogicalDevice &logicalDevice,
     recordCommandBuffer(framebuffers[imageIndex], swapchain, swapchainExtent,
                         renderPass, pipeline, commandBuffer, vertexBuffer,
                         indexBuffer, pipelineLayout, descriptorSets[imageIndex],
-                        indicesSize);
+                        dataAggregator);
     updateFrameUniformBuffer(uniformMapped[imageIndex], frameState);
     const vki::SubmitInfo submitInfo(
         { .waitSemaphores = { &imageAvailableSemaphore },

@@ -2,7 +2,7 @@ include(FetchContent)
 FetchContent_Declare(
     libpng
     GIT_REPOSITORY https://github.com/pnggroup/libpng
-    GIT_TAG v1.6.43
+    GIT_TAG v1.6.44
 )
 set(PNG_FRAMEWORK OFF CACHE BOOL "")
 set(PNG_SHARED OFF CACHE BOOL "")

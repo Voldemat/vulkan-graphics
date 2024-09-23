@@ -9,7 +9,6 @@ if (LIBJPEG_LINKER_TYPE)
 elseif(CMAKE_LINKER_TYPE)
     set(LIBJPEG_LINKER_TYPE_ARG -DCMAKE_LINKER_TYPE=${CMAKE_LINKER_TYPE})
 endif()
-cmake_print_variables(LIBJPEG_LINKER_TYPE_ARG)
 ExternalProject_Add(
     libjpeg
     GIT_REPOSITORY https://github.com/libjpeg-turbo/libjpeg-turbo

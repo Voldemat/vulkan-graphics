@@ -1,14 +1,20 @@
 #include "./app.hpp"
 
+#include <vulkan/vk_platform.h>
+
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 #include "GLFW/glfw3.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/geometric.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/string_cast.hpp"
 #include "glm/trigonometric.hpp"
+#include "vulkan_app/app/data_aggregator.hpp"
 #include "vulkan_app/app/frame_state.hpp"
 
 // clang-format off
@@ -21,7 +27,6 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 #include <format>
 #include <ranges>
@@ -55,33 +60,6 @@
 #include "vulkan_app/vki/surface.hpp"
 #include "vulkan_app/vki/swapchain.hpp"
 
-const std::vector<Vertex> vertices = { { .pos = { -0.5f, -0.5f, 0.0f },
-                                         .color = { 1.0f, 0.0f, 0.0f },
-                                         .texCoord = { 1.0f, 0.0f } },
-                                       { .pos = { 0.5f, -0.5f, 0.0f },
-                                         .color = { 1.0f, 1.0f, 0.0f },
-                                         .texCoord = { 0.0f, 0.0f } },
-                                       { .pos = { 0.5f, 0.5f, 0.0f },
-                                         .color = { 0.0f, 0.0f, 1.0f },
-                                         .texCoord = { 0.0f, 1.0f } },
-                                       { .pos = { -0.5f, 0.5f, 0.0f },
-                                         .color = { 0.0f, 0.0f, 1.0f },
-                                         .texCoord = { 1.0f, 1.0f } },
-
-                                       { .pos = { -0.5f, -0.5f, -0.5f },
-                                         .color = { 1.0f, 0.0f, 0.0f },
-                                         .texCoord = { 0.0f, 0.0f } },
-                                       { .pos = { 0.5f, -0.5f, -0.5f },
-                                         .color = { 0.0f, 1.0f, 0.0f },
-                                         .texCoord = { 1.0f, 0.0f } },
-                                       { .pos = { 0.5f, 0.5f, -0.5f },
-                                         .color = { 0.0f, 0.0f, 1.0f },
-                                         .texCoord = { 1.0f, 1.0f } },
-                                       { .pos = { -0.5f, 0.5f, -0.5f },
-                                         .color = { 1.0f, 1.0f, 1.0f },
-                                         .texCoord = { 0.0f, 1.0f } } };
-
-const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 };
 void processInput(const GLFWControllerWindow &window, FrameState &state,
                   float speedConf) {
     const auto &now = std::chrono::high_resolution_clock::now();
@@ -115,13 +93,63 @@ void processInput(const GLFWControllerWindow &window, FrameState &state,
     if (state.pitch > 89.0f) state.pitch = 89.0f;
     if (state.pitch < -89.0f) state.pitch = -89.0f;
     glm::vec3 direction;
-    direction.x = -cos(glm::radians(state.yaw)) * cos(glm::radians(state.pitch));
+    direction.x =
+        -cos(glm::radians(state.yaw)) * cos(glm::radians(state.pitch));
     direction.y = sin(glm::radians(state.pitch));
     direction.z = sin(glm::radians(state.yaw)) * cos(glm::radians(state.pitch));
     state.cameraFront = glm::normalize(direction);
 };
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL
+debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+              VkDebugUtilsMessageTypeFlagsEXT messageType,
+              const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+              void *pUserData) {
+    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+
+    return VK_FALSE;
+}
+
+VkResult CreateDebugUtilsMessengerEXT(
+    VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+    const VkAllocationCallbacks *pAllocator,
+    VkDebugUtilsMessengerEXT *pDebugMessenger) {
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+        instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void DestroyDebugUtilsMessengerEXT(VkInstance instance,
+                                   VkDebugUtilsMessengerEXT debugMessenger,
+                                   const VkAllocationCallbacks *pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+        instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
 void run_app() {
+    DataAggregator dataAggregator;
+    Triangle triangle(dataAggregator,
+                      { (Vertex){
+                            .pos = { 1.0f, 1.0f, 0.0f },
+                            .color = { 1.0f, 1.0f, 1.0f },
+                        },
+                        (Vertex){
+                            .pos = { -1.0f, 1.0f, 0.0f },
+                            .color = { 1.0f, 1.0f, 1.0f },
+                        },
+                        (Vertex){
+                            .pos = { 0.0f, -1.0f, 0.0f },
+                            .color = { 0.0f, -1.0f, 0.0f },
+                        } },
+                      { 0, 1, 2 });
+    Circle circle(dataAggregator, 3, 1000, 1000);
     auto &mainLogger = *el::Loggers::getLogger("main");
     GLFWController controller;
     mainLogger.info("Created GLFWController");
@@ -130,37 +158,24 @@ void run_app() {
     GLFWControllerWindow window =
         controller.createWindow("Hello triangle", 800, 600, true);
     glfwSetInputMode(window.getGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    window.registerKeyCallback([&shouldClose](int key, int scancode, int action, int mods){
-        if (key == GLFW_KEY_W && mods == 8) {
-            shouldClose = true;
-        };
-    });
+    window.registerKeyCallback(
+        [&shouldClose](int key, int scancode, int action, int mods) {
+            if (key == GLFW_KEY_W && mods == 8) {
+                shouldClose = true;
+            };
+        });
     mainLogger.info("Obtained GLFWControllerWindow...");
 
     auto requiredExtensions = controller.getRequiredExtensions();
+    requiredExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     mainLogger.info("GLFW Required extensions: %v", requiredExtensions);
-    uint32_t count = 0;
-    VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
-    if (result != VK_SUCCESS) {
-        // Throw an exception or log the error
-    }
 
-    std::vector<VkExtensionProperties> extensionProperties(count);
-
-    // Get the extensions
-    result = vkEnumerateInstanceExtensionProperties(nullptr, &count, extensionProperties.data());
-    if (result != VK_SUCCESS) {
-        // Throw an exception or log the error
-    }
-    for (const auto& a : extensionProperties) {
-        std::cout << a.extensionName << std::endl;
-    };
     vki::VulkanInstance instance({
         .extensions = requiredExtensions,
         .appName = "Hello triangle",
         .appVersion = { 1, 0, 0 },
         .apiVersion = VK_API_VERSION_1_3,
-        .layers = { "VK_LAYER_KHRONOS_validation" },
+        .layers = { "VK_LAYER_KHRONOS_validation",  },
     });
     mainLogger.info("Created vulkan instance");
 
@@ -172,7 +187,6 @@ void run_app() {
     mainLogger.info(
         std::format("Picked physical device: {}", (std::string)physicalDevice));
 
-    std::cout << "driver version: " << physicalDevice.properties.driverVersion << std::endl;
     const auto &queueFamily =
         pickQueueFamily(physicalDevice.getQueueFamilies());
     mainLogger.info(std::format("Picked graphics and present queue family: {}",
@@ -186,9 +200,25 @@ void run_app() {
                            std::make_tuple(queueCreateInfo));
     mainLogger.info("Created logical device");
     const auto &queue = logicalDevice.getQueue<0>(queueCreateInfo);
-
     const auto &surfaceDetails = surface.getDetails(physicalDevice);
     mainLogger.info("Got surface details");
+
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerCreateInfoEXT createInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = debugCallback,
+        .pUserData = nullptr,  // Optional
+    };
+    if (CreateDebugUtilsMessengerEXT(instance.getInstance(), &createInfo,
+                                     nullptr, &debugMessenger) != VK_SUCCESS) {
+        throw std::runtime_error("failed to set up debug messenger!");
+    }
 
     const auto &swapchainExtent =
         chooseSwapExtent(surfaceDetails.capabilities, window);
@@ -264,10 +294,9 @@ void run_app() {
         createFramebuffers(logicalDevice, swapchain, swapchainExtent,
                            renderPass, depthImageView, multisampleImageView);
     mainLogger.info("Created framebuffers");
-
     const auto &[vertexBuffer, indexBuffer] = createVertexAndIndicesBuffer(
         logicalDevice, memoryProperties, mainLogger, commandPool, queue,
-        vertices, indices);
+        dataAggregator.getVertices(), dataAggregator.getIndices());
     mainLogger.info("Created index and vertex buffers");
     const auto &[uniformBuffers, uniformMappedMemory] =
         createUniformBuffers(logicalDevice, memoryProperties, mainLogger,
@@ -320,7 +349,7 @@ void run_app() {
                   pipeline, framebuffers, commandBuffer, inFlightFence,
                   imageAvailableSemaphore, renderFinishedSemaphore,
                   vertexBuffer, indexBuffer, queue, queue, uniformMappedMemory,
-                  pipelineLayout, descriptorSets, indices.size(), frameState);
+                  pipelineLayout, descriptorSets, frameState, dataAggregator);
     };
 
     mainLogger.info("Waiting for queued operations to complete...");
