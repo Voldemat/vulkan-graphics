@@ -1,12 +1,9 @@
 #include "./draw_frame.hpp"
 
-#include <MacTypes.h>
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <cstring>
-#include <format>
-#include <iostream>
 #include <vector>
 
 #include "vulkan_app/app/data_aggregator.hpp"
