@@ -8,7 +8,7 @@
 #endif
 #if defined(__linux__) && defined(__ELF__)
 #if defined(__x86_64__) || defined(_M_X64)
-.section .note.GNU-stack,"r",@progbits
+.section .note.GNU-stack,"",@progbits
 #else
 .section .note.GNU-stack,"r",%progbits
 #endif
