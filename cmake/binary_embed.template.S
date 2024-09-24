@@ -2,6 +2,7 @@
 #define PPCAT(A, B) PPCAT_NX(A, B)
 #define STRINGIZE_NX(A) #A
 #define STRINGIZE(A) STRINGIZE_NX(A)
+#define VAR_PREFIX
 #if defined(__APPLE__)
 .section __DATA, __const
 #define VAR_PREFIX _
