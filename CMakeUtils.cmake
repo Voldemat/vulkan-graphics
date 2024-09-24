@@ -31,36 +31,20 @@ function(compile_shaders TARGET_NAME)
   set(compile_shaders_RETURN ${SHADER_TARGETS} PARENT_SCOPE)
 endfunction()
 
-function(generate_obj_assembly INPUT_FILE_BASE INPUT_FILE_NAME)
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        set(SEGMENT_PREFIX "_")
-        set(START_STRING ".section __DATA, __const")
-    elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-        #set(START_STRING ".section .note.GNU-stack, \"\", %progbits")
-    elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-        set(START_STRING ".section .rdata")
-    else()
-        set(START_STRING ".section .rodata, \"a\", %progbits")
-    endif()
-    set(generate_obj_assembly_RETURN "\
-${START_STRING}\n\
-\t.global ${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}\n\
-\t.global ${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}\n\
-${SEGMENT_PREFIX}data_start_${INPUT_FILE_BASE}:\n\
-\t.incbin \"${INPUT_FILE_NAME}\"\n\
-${SEGMENT_PREFIX}data_end_${INPUT_FILE_BASE}:\n\
-" PARENT_SCOPE)
-endfunction()
 function(binary_files_to_object_files TARGET_NAME)
   set(INPUT_TARGETS ${ARGN})
   set(PREPARE_TARGETS)
   foreach(SOURCE_TARGET IN LISTS INPUT_TARGETS)
     get_target_property(SOURCE_TARGET_LOCATION ${SOURCE_TARGET} OUTPUT_NAME)
-    generate_obj_assembly(${SOURCE_TARGET} ${SOURCE_TARGET_LOCATION})
+    set(INPUT_FILE_BASE ${SOURCE_TARGET})
+    set(INPUT_FILE_NAME ${SOURCE_TARGET_LOCATION})
     set(NEW_TARGET_NAME "${SOURCE_TARGET}-object")
     set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${NEW_TARGET_NAME}.dir")
-    set(ASM_PATH "${OUTPUT_DIR}/${SOURCE_TARGET}.s")
-    write_file(${ASM_PATH} ${generate_obj_assembly_RETURN})
+    set(ASM_PATH "${OUTPUT_DIR}/${SOURCE_TARGET}.S")
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/binary_embed.template.S
+        ${ASM_PATH}
+    )
     add_library(
         ${NEW_TARGET_NAME}
         OBJECT "${ASM_PATH}"
