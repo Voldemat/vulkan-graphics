@@ -13,6 +13,7 @@
 #else
 .section .note.GNU-stack,"r",%progbits
 #endif
+.rodata
 #endif
 .global STRINGIZE(PPCAT(VAR_PREFIX, data_start_${INPUT_FILE_BASE}))
 .global STRINGIZE(PPCAT(VAR_PREFIX, data_end_${INPUT_FILE_BASE}))
